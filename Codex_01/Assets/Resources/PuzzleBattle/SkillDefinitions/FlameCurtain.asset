@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2411fc2cbbdb184f8d6f165cb595e64, type: 3}
+  m_Name: FlameCurtain
+  m_EditorClassIdentifier: Assembly-CSharp::PuzzleBattle.FlameCurtainSkillDefinition
+  skillId: 2
+  displayName: "\uD654\uC5FC \uC7A5\uB9C9"
+  shortName: "\uC7A5\uB9C9"
+  description: "\uBD89\uC740 \uAD6C\uC2AC\uC774 \uD130\uC9C0\uBA74 \uC801 \uAC00\uB85C\uC904\uC5D0
+    \uD654\uC5FC \uC7A5\uB9C9\uC744 \uC0DD\uC131\uD574 \uC9C0\uB098\uAC00\uB294 \uC801\uC5D0\uAC8C
+    \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+  accentColor: {r: 1, g: 0.38, b: 0.19, a: 1}
+  maxLevel: 5
+  curtainEffectPrefab: {fileID: 4514403452643366658, guid: 29f908f026867d9409b6f1c7039746cd, type: 3}
+  baseDamagePerTurn: 7
+  damagePerLevel: 2
+  damagePerRed: 2.5
+  baseDurationTurns: 3
+  durationPerLevel: 1
+  extraTurnsPerRed: 0.5
+  startWidthNormalized: 0.35
+  widthBonusPerLevel: 0.08
+  fullSpanThreshold: 5
+  thresholdReductionPerLevel: 0

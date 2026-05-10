@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7a0ca2f32601a344a95856c02991090, type: 3}
+  m_Name: PoisonNeedles
+  m_EditorClassIdentifier: Assembly-CSharp::PuzzleBattle.PoisonNeedleSkillDefinition
+  skillId: 7
+  displayName: "\uB3C5\uCE68"
+  shortName: "\uB3C5\uCE68"
+  description: "\uD30C\uAD34\uB41C \uAC80\uC740 \uAD6C\uC2AC \uC218\uB9CC\uD07C \uB3C5\uCE68\uC744
+    \uBC1C\uC0AC\uD574 3\uD134 \uB3D9\uC548 \uC9C0\uC18D \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4."
+  accentColor: {r: 0.42, g: 0.9, b: 0.42, a: 1}
+  maxLevel: 5
+  effectPrefab: {fileID: 6695797549891623185, guid: 217f64c58f28e014cbdb04fe7ca80e37, type: 3}
+  baseDamage: 2
+  damagePerLevel: 1
+  dotDamagePerTurn: 2
+  dotDamagePerLevel: 1
+  dotTurns: 3
+  projectileSpeed: 8.5
+  projectileSpeedPerLevel: 0.4
+  fallbackScale: 0.38

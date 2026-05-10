@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff5a7de540f275744b1307950c855f15, type: 3}
+  m_Name: MonsterWaveProfile
+  m_EditorClassIdentifier: 
+  laneCount: 7
+  maxConcurrentMonsters: 6
+  spawnInterval: 2.25
+  fallSpeed: 0.55
+  fallSpeedVariance: 0.12
+  baseHealth: 16
+  healthVariance: 3
+  roundDuration: 60
+  roundHealthIncrease: 6
+  roundSpeedIncrease: 0.05
+  spawnIntervalDecayPerRound: 0.08
+  maxConcurrentIncreasePerRound: 1
+  battlefieldRows: 7
+  spawnTurnsPerRound: 3
+  spawnTurnsGrowthPerRound: 1
+  spawnsPerTurn: 2
+  lanePadding: 0
+  monsterWidth: 1.65
+  monsterHeight: 1.15
+  touchBoundaryPadding: 0.55
+  deathDuration: 0.2
+  monsterTint: {r: 0.91, g: 0.41, b: 0.32, a: 1}

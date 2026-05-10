@@ -1,0 +1,6 @@
+C:\Users\dlfgu\Desktop\Codex_01\obj\Debug\Assembly-CSharp.csproj.AssemblyReference.cache
+C:\Users\dlfgu\Desktop\Codex_01\obj\Debug\Assembly-CSharp.csproj.CoreCompileInputs.cache
+C:\Users\dlfgu\Desktop\Codex_01\Temp\bin\Debug\Assembly-CSharp.dll
+C:\Users\dlfgu\Desktop\Codex_01\Temp\bin\Debug\Assembly-CSharp.pdb
+C:\Users\dlfgu\Desktop\Codex_01\obj\Debug\Assembly-CSharp.dll
+C:\Users\dlfgu\Desktop\Codex_01\obj\Debug\Assembly-CSharp.pdb

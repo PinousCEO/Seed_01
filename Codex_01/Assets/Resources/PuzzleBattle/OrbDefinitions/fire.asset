@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8286a0880119d7745903f57ea735071e, type: 3}
+  m_Name: fire
+  m_EditorClassIdentifier: 
+  orbId: fire
+  tint: {r: 1, g: 1, b: 1, a: 1}
+  spriteOverride: {fileID: 21300000, guid: 51c821e580b97ac4a94730cc1c28c9f3, type: 3}
+  projectileEffectPrefab: {fileID: 181162610498379197, guid: 7bdc32c493541b64fa8b83014ae97225, type: 3}
+  damagePerOrb: 14

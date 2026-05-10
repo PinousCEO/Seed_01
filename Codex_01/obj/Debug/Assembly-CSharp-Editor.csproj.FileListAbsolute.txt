@@ -1,0 +1,2 @@
+C:\Users\dlfgu\Desktop\Codex_01\obj\Debug\Assembly-CSharp-Editor.csproj.AssemblyReference.cache
+C:\Users\dlfgu\Desktop\Codex_01\obj\Debug\Assembly-CSharp-Editor.csproj.CoreCompileInputs.cache

@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1ad0f6d7ac84f1594d6903d0be810e1, type: 3}
+  m_Name: OrbPrefabCatalog
+  m_EditorClassIdentifier: 
+  entries:
+  - definition: {fileID: 11400000, guid: f89ecf63e96046e5a6e7aa4dc516e391, type: 2}
+    prefab: {fileID: 781200004, guid: 7812a87a0ce94d7a9605d7b4326078ba, type: 3}
+  - definition: {fileID: 11400000, guid: 502b7d6543d14c0f8bacccab51569144, type: 2}
+    prefab: {fileID: 781300004, guid: afcc9f0537f340d0a15e2b8bf66c9f4e, type: 3}
+  - definition: {fileID: 11400000, guid: 15ea6aec51dd47d3b6d3b40ac10064c7, type: 2}
+    prefab: {fileID: 781400004, guid: d5934ab8db554d8daa61d6ab0e001bf7, type: 3}
+  - definition: {fileID: 11400000, guid: 837500d76db64f91830e63dc74d8a4fa, type: 2}
+    prefab: {fileID: 781500004, guid: 2507fe245a044a9d9f1ffea8c370aa8c, type: 3}
+  - definition: {fileID: 11400000, guid: 1e1d58f516d342c79f54f47bad2d6284, type: 2}
+    prefab: {fileID: 781600004, guid: 0be9bca9b2b245f3a66ab81fc5d7c4ad, type: 3}

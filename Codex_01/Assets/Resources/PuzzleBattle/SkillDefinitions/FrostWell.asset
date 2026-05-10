@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8c320106e8bf0e45909b1935cf22797, type: 3}
+  m_Name: FrostWell
+  m_EditorClassIdentifier: Assembly-CSharp::PuzzleBattle.FrostWellSkillDefinition
+  skillId: 1
+  displayName: "\uC11C\uB9AC \uC6B0\uBB3C"
+  shortName: "\uC6B0\uBB3C"
+  description: "\uD30C\uB780 \uAD6C\uC2AC\uC774 \uD130\uC9C0\uBA74 \uC801 \uC704\uCE58\uC5D0
+    \uC6D0\uD615 \uC6B0\uBB3C\uC744 \uC124\uCE58\uD574 \uC9C0\uC18D \uD53C\uD574\uC640
+    \uAC10\uC18D\uC744 \uBD80\uC5EC\uD569\uB2C8\uB2E4."
+  accentColor: {r: 0.36, g: 0.77, b: 1, a: 1}
+  maxLevel: 5
+  wellEffectPrefab: {fileID: 392432026328215853, guid: 6455e51d1ce10b04bad2987339bedc80, type: 3}
+  baseDamagePerTurn: 3
+  damagePerLevel: 1
+  damagePerBlue: 0.65
+  baseDurationTurns: 3
+  durationPerLevel: 1
+  extraTurnsPerBlue: 0.33
+  minRadiusCells: 0.75
+  maxRadiusCells: 1.65
+  radiusBonusPerLevel: 0.08
+  startSlowMultiplier: 0.72
+  maxSlowMultiplier: 0.45
+  extraSlowPerLevel: 0.04

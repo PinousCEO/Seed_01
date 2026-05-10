@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8286a0880119d7745903f57ea735071e, type: 3}
+  m_Name: dark
+  m_EditorClassIdentifier: 
+  orbId: dark
+  tint: {r: 0.62, g: 0.46, b: 0.92, a: 1}
+  spriteOverride: {fileID: 21300000, guid: 3494b30eed19cca49b50f35df57ead5a, type: 3}
+  projectileEffectPrefab: {fileID: 5349920786281962114, guid: c1e63fcfd4854af4790a2bd251495d8b, type: 3}
+  damagePerOrb: 15
