@@ -14,7 +14,10 @@ namespace PuzzleBattle
         PoisonNeedles,
         IceOrb,
         SolarBeacon,
-        TrapMine
+        TrapMine,
+        ChainLightning,
+        DeathBeam,
+        DeathBomb
     }
 
     public abstract class PuzzleBattleSkillDefinition : ScriptableObject

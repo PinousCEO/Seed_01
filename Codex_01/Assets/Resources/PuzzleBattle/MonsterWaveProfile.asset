@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff5a7de540f275744b1307950c855f15, type: 3}
   m_Name: MonsterWaveProfile
   m_EditorClassIdentifier: 
-  laneCount: 7
+  laneCount: 6
   maxConcurrentMonsters: 6
   spawnInterval: 2.25
   fallSpeed: 0.55
@@ -33,4 +33,23 @@ MonoBehaviour:
   monsterHeight: 1.15
   touchBoundaryPadding: 0.55
   deathDuration: 0.2
+  baseCoinReward: 2
+  coinVariance: 1
+  coinRewardIncreasePerRound: 0
   monsterTint: {r: 0.91, g: 0.41, b: 0.32, a: 1}
+  playerMaxHealth: 500
+  escapeDamage: 4
+  escapeDamageIncreasePerRound: 1
+  rangedMonsterChance: 0.1
+  rangedAttackDamage: 20
+  rangedAttackDamageIncreasePerRound: 1
+  rangedProjectileSpeed: 8.5
+  rangedMonsterTint: {r: 0.42, g: 0.72, b: 0.96, a: 1}
+  finalRound: 20
+  bossHealth: 220
+  bossContactWidthCells: 2
+  bossContactHeightCells: 2
+  bossSummonChancePerTurn: 0.65
+  bossMinSummonCount: 1
+  bossMaxSummonCount: 2
+  bossTint: {r: 0.7, g: 0.24, b: 0.95, a: 1}

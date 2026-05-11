@@ -33,11 +33,17 @@ namespace PuzzleBattle
 
         public void Initialize(OrbVisualDefinition definition, OrbMotionProfile motionProfile, float baseScale)
         {
+            StopAllCoroutines();
+            _moveRoutine = null;
+            _popRoutine = null;
+            _isSelected = false;
             _definition = definition;
             _motionProfile = motionProfile;
             _baseScale = baseScale;
             _selectedSeed = Random.Range(0f, 100f);
             _isPopped = false;
+            _animationScale = 1f;
+            gameObject.SetActive(true);
 
             EnsureRendererReference();
             bool hasPrefabRenderer = _renderer != null;
@@ -55,6 +61,24 @@ namespace PuzzleBattle
             ApplyDefinitionVisuals();
             _renderer.sortingOrder = 20;
             UpdateScale();
+        }
+
+        public void DeactivateForPool()
+        {
+            StopAllCoroutines();
+            _moveRoutine = null;
+            _popRoutine = null;
+            _isSelected = false;
+            _isPopped = false;
+            _animationScale = 1f;
+
+            if (_renderer != null)
+            {
+                Color color = _renderer.color;
+                _renderer.color = new Color(color.r, color.g, color.b, 1f);
+            }
+
+            gameObject.SetActive(false);
         }
 
         public void SetSelected(bool selected)

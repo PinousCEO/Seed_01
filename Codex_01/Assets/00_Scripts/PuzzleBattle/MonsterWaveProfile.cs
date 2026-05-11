@@ -5,7 +5,7 @@ namespace PuzzleBattle
     [CreateAssetMenu(menuName = "Puzzle Battle/Monster Wave Profile", fileName = "MonsterWaveProfile")]
     public sealed class MonsterWaveProfile : ScriptableObject
     {
-        [SerializeField] private int laneCount = 7;
+        [SerializeField] private int laneCount = 6;
         [SerializeField] private int maxConcurrentMonsters = 6;
         [SerializeField] private float spawnInterval = 2.25f;
         [SerializeField] private float fallSpeed = 0.55f;
@@ -30,6 +30,22 @@ namespace PuzzleBattle
         [SerializeField] private int coinVariance = 1;
         [SerializeField] private int coinRewardIncreasePerRound = 0;
         [SerializeField] private Color monsterTint = new Color(0.91f, 0.41f, 0.32f);
+        [SerializeField] private int playerMaxHealth = 500;
+        [SerializeField] private int escapeDamage = 4;
+        [SerializeField] private int escapeDamageIncreasePerRound = 1;
+        [SerializeField] private float rangedMonsterChance = 0.1f;
+        [SerializeField] private int rangedAttackDamage = 20;
+        [SerializeField] private int rangedAttackDamageIncreasePerRound = 1;
+        [SerializeField] private float rangedProjectileSpeed = 8.5f;
+        [SerializeField] private Color rangedMonsterTint = new Color(0.42f, 0.72f, 0.96f, 1f);
+        [SerializeField] private int finalRound = 20;
+        [SerializeField] private int bossHealth = 220;
+        [SerializeField] private int bossContactWidthCells = 2;
+        [SerializeField] private int bossContactHeightCells = 2;
+        [SerializeField] private float bossSummonChancePerTurn = 0.65f;
+        [SerializeField] private int bossMinSummonCount = 1;
+        [SerializeField] private int bossMaxSummonCount = 2;
+        [SerializeField] private Color bossTint = new Color(0.7f, 0.24f, 0.95f, 1f);
 
         public int LaneCount => Mathf.Max(1, laneCount);
         public int MaxConcurrentMonsters => Mathf.Max(1, maxConcurrentMonsters);
@@ -56,6 +72,22 @@ namespace PuzzleBattle
         public int CoinVariance => Mathf.Max(0, coinVariance);
         public int CoinRewardIncreasePerRound => Mathf.Max(0, coinRewardIncreasePerRound);
         public Color MonsterTint => monsterTint;
+        public int PlayerMaxHealth => Mathf.Max(1, playerMaxHealth);
+        public int EscapeDamage => Mathf.Max(1, escapeDamage);
+        public int EscapeDamageIncreasePerRound => Mathf.Max(0, escapeDamageIncreasePerRound);
+        public float RangedMonsterChance => Mathf.Clamp(rangedMonsterChance <= 0f ? 0.1f : rangedMonsterChance, 0f, 1f);
+        public int RangedAttackDamage => Mathf.Max(1, rangedAttackDamage <= 0 ? 20 : rangedAttackDamage);
+        public int RangedAttackDamageIncreasePerRound => Mathf.Max(0, rangedAttackDamageIncreasePerRound);
+        public float RangedProjectileSpeed => Mathf.Max(0.5f, rangedProjectileSpeed <= 0f ? 8.5f : rangedProjectileSpeed);
+        public Color RangedMonsterTint => rangedMonsterTint.a <= 0f ? new Color(0.42f, 0.72f, 0.96f, 1f) : rangedMonsterTint;
+        public int FinalRound => Mathf.Max(1, finalRound <= 0 ? 20 : finalRound);
+        public int BossHealth => Mathf.Max(1, bossHealth <= 0 ? 220 : bossHealth);
+        public int BossWidthCells => Mathf.Max(2, bossContactWidthCells <= 0 ? 2 : bossContactWidthCells);
+        public int BossHeightCells => Mathf.Max(2, bossContactHeightCells <= 0 ? 2 : bossContactHeightCells);
+        public float BossSummonChancePerTurn => Mathf.Clamp01(bossSummonChancePerTurn <= 0f ? 0.65f : bossSummonChancePerTurn);
+        public int BossMinSummonCount => Mathf.Max(1, bossMinSummonCount <= 0 ? 1 : bossMinSummonCount);
+        public int BossMaxSummonCount => Mathf.Max(BossMinSummonCount, bossMaxSummonCount <= 0 ? 2 : bossMaxSummonCount);
+        public Color BossTint => bossTint.a <= 0f ? new Color(0.7f, 0.24f, 0.95f, 1f) : bossTint;
 
         public void SetAuthoringDefaults()
         {
@@ -69,7 +101,7 @@ namespace PuzzleBattle
 
         private void ApplyDefaults(HideFlags flags)
         {
-            laneCount = 7;
+            laneCount = 6;
             maxConcurrentMonsters = 6;
             spawnInterval = 2.25f;
             fallSpeed = 0.55f;
@@ -94,6 +126,22 @@ namespace PuzzleBattle
             coinVariance = 1;
             coinRewardIncreasePerRound = 0;
             monsterTint = new Color(0.91f, 0.41f, 0.32f);
+            playerMaxHealth = 500;
+            escapeDamage = 4;
+            escapeDamageIncreasePerRound = 1;
+            rangedMonsterChance = 0.1f;
+            rangedAttackDamage = 20;
+            rangedAttackDamageIncreasePerRound = 1;
+            rangedProjectileSpeed = 8.5f;
+            rangedMonsterTint = new Color(0.42f, 0.72f, 0.96f, 1f);
+            finalRound = 20;
+            bossHealth = 220;
+            bossContactWidthCells = 2;
+            bossContactHeightCells = 2;
+            bossSummonChancePerTurn = 0.65f;
+            bossMinSummonCount = 1;
+            bossMaxSummonCount = 2;
+            bossTint = new Color(0.7f, 0.24f, 0.95f, 1f);
             hideFlags = flags;
         }
     }

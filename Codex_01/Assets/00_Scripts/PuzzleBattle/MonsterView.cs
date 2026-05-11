@@ -81,68 +81,52 @@ namespace PuzzleBattle
         private TextMesh _label;
         private MeshRenderer _labelRenderer;
         private Coroutine _flashRoutine;
+        private Coroutine _deathRoutine;
         private Color _baseTint;
         private int _maxHealth;
         private int _currentHealth;
         private int _sortingOrderBase = 10;
+        private System.Action<MonsterView> _deathCompleted;
 
         public float Width { get; private set; }
         public float Height { get; private set; }
 
         public void Initialize(string label, int maxHealth, float width, float height, Color tint)
         {
+            StopAllCoroutines();
+            _flashRoutine = null;
+            _deathRoutine = null;
+            _deathCompleted = null;
+            gameObject.SetActive(true);
+            transform.localScale = Vector3.one;
             _maxHealth = Mathf.Max(1, maxHealth);
             _currentHealth = _maxHealth;
             _baseTint = tint;
             Width = width;
             Height = height;
 
-            GameObject shadow = new GameObject("Shadow");
-            shadow.transform.SetParent(transform, false);
-            _shadowRenderer = shadow.AddComponent<SpriteRenderer>();
+            EnsureVisuals();
             _shadowRenderer.sprite = ProceduralSpriteLibrary.GetMonsterSprite();
             _shadowRenderer.color = new Color(0f, 0f, 0f, 0.18f);
-            _shadowRenderer.sortingOrder = 5;
-            shadow.transform.localScale = new Vector3(width * 1.05f, height * 0.38f, 1f);
-            shadow.transform.localPosition = new Vector3(0f, -height * 0.52f, 0f);
+            _shadowRenderer.transform.localScale = new Vector3(width * 1.05f, height * 0.38f, 1f);
+            _shadowRenderer.transform.localPosition = new Vector3(0f, -height * 0.52f, 0f);
 
-            GameObject body = new GameObject("Body");
-            body.transform.SetParent(transform, false);
-            _bodyRenderer = body.AddComponent<SpriteRenderer>();
             _bodyRenderer.sprite = ProceduralSpriteLibrary.GetMonsterSprite();
             _bodyRenderer.color = tint;
-            _bodyRenderer.sortingOrder = 10;
-            body.transform.localScale = new Vector3(width, height, 1f);
+            _bodyRenderer.transform.localScale = new Vector3(width, height, 1f);
+            _bodyRenderer.transform.localPosition = Vector3.zero;
 
-            GameObject barBackground = new GameObject("HpBackground");
-            barBackground.transform.SetParent(transform, false);
-            _barBackgroundRenderer = barBackground.AddComponent<SpriteRenderer>();
-            _barBackgroundRenderer.sprite = ProceduralSpriteLibrary.GetSquareSprite();
             _barBackgroundRenderer.color = new Color(0f, 0f, 0f, 0.35f);
-            _barBackgroundRenderer.sortingOrder = 11;
-            barBackground.transform.localScale = new Vector3(width * 0.82f, 0.08f, 1f);
-            barBackground.transform.localPosition = new Vector3(0f, -(height * 0.64f), 0f);
+            _barBackgroundRenderer.transform.localScale = new Vector3(width * 0.82f, 0.08f, 1f);
+            _barBackgroundRenderer.transform.localPosition = new Vector3(0f, -(height * 0.64f), 0f);
 
-            GameObject barFill = new GameObject("HpFill");
-            barFill.transform.SetParent(barBackground.transform, false);
-            _barFillRenderer = barFill.AddComponent<SpriteRenderer>();
-            _barFillRenderer.sprite = ProceduralSpriteLibrary.GetSquareSprite();
             _barFillRenderer.color = new Color(0.33f, 0.95f, 0.48f, 1f);
-            _barFillRenderer.sortingOrder = 12;
-            barFill.transform.localScale = new Vector3(1f, 0.8f, 1f);
-            barFill.transform.localPosition = new Vector3(0f, 0f, 0f);
+            _barFillRenderer.transform.localScale = new Vector3(1f, 0.8f, 1f);
+            _barFillRenderer.transform.localPosition = Vector3.zero;
 
-            GameObject labelObject = new GameObject("Label");
-            labelObject.transform.SetParent(transform, false);
-            _label = labelObject.AddComponent<TextMesh>();
-            _label.anchor = TextAnchor.MiddleCenter;
-            _label.alignment = TextAlignment.Center;
-            _label.characterSize = 0.095f;
-            _label.fontSize = 36;
             _label.color = Color.white;
             _label.text = maxHealth.ToString();
-            labelObject.transform.localPosition = new Vector3(0f, -(height * 0.46f), 0f);
-            _labelRenderer = labelObject.GetComponent<MeshRenderer>();
+            _label.transform.localPosition = new Vector3(0f, -(height * 0.46f), 0f);
 
             UpdateHealthVisuals();
         }
@@ -188,9 +172,25 @@ namespace PuzzleBattle
             return _currentHealth <= 0;
         }
 
-        public void PlayDeath()
+        public void PlayDeath(System.Action<MonsterView> onCompleted = null)
         {
-            StartCoroutine(DeathRoutine());
+            if (_deathRoutine != null)
+            {
+                StopCoroutine(_deathRoutine);
+            }
+
+            _deathCompleted = onCompleted;
+            _deathRoutine = StartCoroutine(DeathRoutine());
+        }
+
+        public void DeactivateImmediate()
+        {
+            StopAllCoroutines();
+            _flashRoutine = null;
+            _deathRoutine = null;
+            _deathCompleted = null;
+            ResetVisualState();
+            gameObject.SetActive(false);
         }
 
         private void UpdateHealthVisuals()
@@ -225,6 +225,74 @@ namespace PuzzleBattle
 
             DamagePopupAnimator animator = popupObject.AddComponent<DamagePopupAnimator>();
             animator.Initialize(popupObject.transform, popup, popupRenderer, Width, Height, _sortingOrderBase + 12);
+        }
+
+        private void EnsureVisuals()
+        {
+            if (_shadowRenderer == null)
+            {
+                GameObject shadow = new GameObject("Shadow");
+                shadow.transform.SetParent(transform, false);
+                _shadowRenderer = shadow.AddComponent<SpriteRenderer>();
+                _shadowRenderer.sortingOrder = 5;
+            }
+
+            if (_bodyRenderer == null)
+            {
+                GameObject body = new GameObject("Body");
+                body.transform.SetParent(transform, false);
+                _bodyRenderer = body.AddComponent<SpriteRenderer>();
+                _bodyRenderer.sortingOrder = 10;
+            }
+
+            if (_barBackgroundRenderer == null)
+            {
+                GameObject barBackground = new GameObject("HpBackground");
+                barBackground.transform.SetParent(transform, false);
+                _barBackgroundRenderer = barBackground.AddComponent<SpriteRenderer>();
+                _barBackgroundRenderer.sprite = ProceduralSpriteLibrary.GetSquareSprite();
+                _barBackgroundRenderer.sortingOrder = 11;
+            }
+
+            if (_barFillRenderer == null)
+            {
+                GameObject barFill = new GameObject("HpFill");
+                barFill.transform.SetParent(_barBackgroundRenderer.transform, false);
+                _barFillRenderer = barFill.AddComponent<SpriteRenderer>();
+                _barFillRenderer.sprite = ProceduralSpriteLibrary.GetSquareSprite();
+                _barFillRenderer.sortingOrder = 12;
+            }
+
+            if (_label == null)
+            {
+                GameObject labelObject = new GameObject("Label");
+                labelObject.transform.SetParent(transform, false);
+                _label = labelObject.AddComponent<TextMesh>();
+                _label.anchor = TextAnchor.MiddleCenter;
+                _label.alignment = TextAlignment.Center;
+                _label.characterSize = 0.095f;
+                _label.fontSize = 36;
+                _labelRenderer = labelObject.GetComponent<MeshRenderer>();
+            }
+            else if (_labelRenderer == null)
+            {
+                _labelRenderer = _label.GetComponent<MeshRenderer>();
+            }
+        }
+
+        private void ResetVisualState()
+        {
+            transform.localScale = Vector3.one;
+
+            if (_bodyRenderer != null)
+            {
+                _bodyRenderer.color = _baseTint;
+            }
+
+            if (_barFillRenderer != null)
+            {
+                _barFillRenderer.color = new Color(0.33f, 0.95f, 0.48f, 1f);
+            }
         }
 
         private IEnumerator FlashRoutine(Color flashTint)
@@ -263,7 +331,12 @@ namespace PuzzleBattle
                 yield return null;
             }
 
-            Destroy(gameObject);
+            _deathRoutine = null;
+            ResetVisualState();
+            gameObject.SetActive(false);
+            System.Action<MonsterView> callback = _deathCompleted;
+            _deathCompleted = null;
+            callback?.Invoke(this);
         }
     }
 }

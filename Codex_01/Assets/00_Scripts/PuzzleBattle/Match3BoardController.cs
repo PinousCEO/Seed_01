@@ -101,6 +101,7 @@ namespace PuzzleBattle
         {
             public OrbVisualDefinition Definition;
             public BoardPieceView View;
+            public int PoolKey;
         }
 
         public event System.Action<IReadOnlyList<MatchResult>> MatchesCleared;
@@ -114,6 +115,7 @@ namespace PuzzleBattle
         private SpriteRenderer _backdrop;
         private SpriteRenderer _frame;
         private readonly List<SpriteRenderer> _gridLines = new List<SpriteRenderer>();
+        private readonly Dictionary<int, SimplePool<BoardPieceView>> _pieceViewPools = new Dictionary<int, SimplePool<BoardPieceView>>();
         private float _cellSize;
         private Vector2 _origin;
         private bool _inputEnabled;
@@ -398,7 +400,7 @@ namespace PuzzleBattle
 
                     if (piece != null)
                     {
-                        Destroy(piece.View.gameObject);
+                        ReleasePiece(piece);
                         _pieces[cell.x, cell.y] = null;
                     }
                 }
@@ -596,18 +598,8 @@ namespace PuzzleBattle
         private BoardPiece CreatePiece(int x, int y, OrbVisualDefinition definition, bool spawnAbove, int spawnOffset)
         {
             BoardPieceView prefab = _profile.GetOrbPrefab(definition);
-            BoardPieceView view;
-
-            if (prefab != null)
-            {
-                view = Instantiate(prefab, transform);
-            }
-            else
-            {
-                GameObject pieceObject = new GameObject();
-                pieceObject.transform.SetParent(transform, false);
-                view = pieceObject.AddComponent<BoardPieceView>();
-            }
+            int poolKey = GetPiecePoolKey(prefab);
+            BoardPieceView view = GetPieceViewFromPool(prefab, poolKey);
 
             string orbId = definition != null ? definition.OrbId : "orb";
             view.name = $"Piece_{orbId}_{x}_{y}";
@@ -627,7 +619,8 @@ namespace PuzzleBattle
             BoardPiece piece = new BoardPiece
             {
                 Definition = definition,
-                View = view
+                View = view,
+                PoolKey = poolKey
             };
 
             _pieces[x, y] = piece;
@@ -670,6 +663,58 @@ namespace PuzzleBattle
         private OrbVisualDefinition GetRandomDefinition()
         {
             return OrbDefinitions[Random.Range(0, OrbDefinitions.Length)];
+        }
+
+        private int GetPiecePoolKey(BoardPieceView prefab)
+        {
+            return prefab != null ? prefab.GetInstanceID() : 0;
+        }
+
+        private BoardPieceView GetPieceViewFromPool(BoardPieceView prefab, int poolKey)
+        {
+            if (!_pieceViewPools.TryGetValue(poolKey, out SimplePool<BoardPieceView> pool))
+            {
+                pool = new SimplePool<BoardPieceView>(
+                    () =>
+                    {
+                        BoardPieceView createdView;
+
+                        if (prefab != null)
+                        {
+                            createdView = Instantiate(prefab, transform);
+                        }
+                        else
+                        {
+                            GameObject pieceObject = new GameObject("BoardPiece");
+                            pieceObject.transform.SetParent(transform, false);
+                            createdView = pieceObject.AddComponent<BoardPieceView>();
+                        }
+
+                        return createdView;
+                    },
+                    view => view.gameObject.SetActive(true),
+                    view => view.DeactivateForPool());
+                _pieceViewPools.Add(poolKey, pool);
+            }
+
+            return pool.Get();
+        }
+
+        private void ReleasePiece(BoardPiece piece)
+        {
+            if (piece == null || piece.View == null)
+            {
+                return;
+            }
+
+            if (_pieceViewPools.TryGetValue(piece.PoolKey, out SimplePool<BoardPieceView> pool))
+            {
+                pool.Release(piece.View);
+            }
+            else
+            {
+                piece.View.DeactivateForPool();
+            }
         }
 
         private void SwapForDrag(Vector2Int first, Vector2Int second)

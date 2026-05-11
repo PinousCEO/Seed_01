@@ -52,6 +52,7 @@ namespace PuzzleBattle
             public RectTransform Root;
             public Image Icon;
             public int Value;
+            public bool IsHealthPickup;
             public CoinPickupState State;
             public Vector2 StartLocal;
             public Vector2 ControlLocal;
@@ -64,6 +65,7 @@ namespace PuzzleBattle
         private Camera _camera;
         private PuzzleBattleBoardProfile _boardProfile;
         private MonsterWaveProfile _monsterWaveProfile;
+        private PlayerStatusProfile _playerStatusProfile;
         private readonly List<PuzzleBattleSkillDefinition> _skillDefinitions = new List<PuzzleBattleSkillDefinition>();
         private readonly Dictionary<PuzzleBattleSkillId, int> _skillLevels = new Dictionary<PuzzleBattleSkillId, int>();
         private SpriteRenderer _topBackground;
@@ -71,11 +73,19 @@ namespace PuzzleBattle
         private SpriteRenderer _wallDeco;
         private SpriteRenderer _bottomBackground;
         private SpriteRenderer _divider;
+        private PuzzleBattleCanvasHost _canvasHost;
         private Canvas _uiCanvas;
         private RectTransform _uiRoot;
         private RectTransform _topUiRoot;
         private RectTransform _cardAreaRoot;
         private RectTransform _coinHudRoot;
+        private RectTransform _turnTimerBarRoot;
+        private Image _turnTimerBarBackground;
+        private Image _turnTimerBarFill;
+        private RectTransform _playerHealthRoot;
+        private Image _playerHealthBarBackground;
+        private Image _playerHealthBarFill;
+        private Text _playerHealthLabel;
         private Font _uiFont;
         private Match3BoardController _boardController;
         private MonsterLaneController _monsterLaneController;
@@ -91,6 +101,7 @@ namespace PuzzleBattle
         private readonly List<SkillChoiceCard> _skillCards = new List<SkillChoiceCard>();
         private readonly List<PuzzleBattleSkillDefinition> _presentedChoices = new List<PuzzleBattleSkillDefinition>();
         private readonly List<CoinPickupVisual> _coinPickups = new List<CoinPickupVisual>();
+        private SimplePool<CoinPickupVisual> _coinPickupPool;
         private Vector2Int _lastScreenSize;
         private Rect _monsterRegion;
         private Coroutine _comboRoutine;
@@ -98,13 +109,19 @@ namespace PuzzleBattle
         private Coroutine _turnAdvanceRoutine;
         private int _currentRound = 1;
         private int _coins;
+        private int _playerAttackBonus;
+        private int _playerMaxHealth;
+        private int _playerCurrentHealth;
         private int _blueOrbsClearedThisRound;
+        private float _turnTimeRemaining;
+        private bool _turnTimerActive;
         private bool _battleActive;
         private bool _gameOver;
         private bool _skillSelectionActive;
         private bool _settingsOpen;
         private string _statusText = "Pick a skill to begin.";
         private string _defaultComboText = "Select a skill to start the round.";
+        private const float PlayerTurnDurationSeconds = 20f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -122,9 +139,15 @@ namespace PuzzleBattle
         {
             CleanupLegacySceneObjects();
             _camera = EnsureCamera();
+            _canvasHost = FindFirstObjectByType<PuzzleBattleCanvasHost>();
             _boardProfile = LoadBoardProfile();
             _monsterWaveProfile = LoadMonsterWaveProfile();
+            _playerStatusProfile = LoadPlayerStatusProfile();
             LoadSkillDefinitions();
+            _playerMaxHealth = _playerStatusProfile != null ? _playerStatusProfile.MaxHealth : 500;
+            _playerAttackBonus = _playerStatusProfile != null ? _playerStatusProfile.AttackBonus : 8;
+            _playerCurrentHealth = _playerMaxHealth;
+            _turnTimeRemaining = PlayerTurnDurationSeconds;
 
             CreateSceneVisuals();
             CreateControllers();
@@ -147,11 +170,13 @@ namespace PuzzleBattle
             }
 
             UpdateCoinPickups();
+            UpdateTurnTimer();
             UpdateHud();
         }
 
         private void OnMonsterReachedPlayer()
         {
+            StopPlayerTurnTimer();
             _battleActive = false;
             _gameOver = true;
             _skillSelectionActive = false;
@@ -170,19 +195,37 @@ namespace PuzzleBattle
                 return;
             }
 
+            StopPlayerTurnTimer();
             _battleActive = false;
             _boardController.SetInputEnabled(false);
             _monsterLaneController.SetBattleActive(false);
             _monsterLaneController.ClearTransientEffects();
+
+            if (_currentRound >= (_monsterWaveProfile != null ? _monsterWaveProfile.FinalRound : 20))
+            {
+                _gameOver = true;
+                _statusText = "Final boss defeated.";
+                _defaultComboText = "Victory.";
+                SetSkillCardsVisible(false);
+                return;
+            }
+
             _currentRound++;
             _statusText = $"Round cleared. Choose a skill for Round {_currentRound}.";
             _defaultComboText = "All cascades from one move count as one attack.";
             ShowSkillSelectionForCurrentRound();
         }
 
-        private void OnMonsterDefeated(Vector3 worldPosition, int coinReward)
+        private void OnMonsterDefeated(Vector3 worldPosition, int coinReward, bool droppedHealthPickup)
         {
             SpawnCoinDrops(worldPosition, coinReward);
+
+            if (droppedHealthPickup)
+            {
+                SpawnHealthPickup(worldPosition, _playerStatusProfile != null ? _playerStatusProfile.HealPickupAmount : 20);
+            }
+
+            ApplyDeathTriggeredSkills(worldPosition);
         }
 
         private void OnTurnResolved(Match3BoardController.AttackResult attack)
@@ -191,6 +234,8 @@ namespace PuzzleBattle
             {
                 return;
             }
+
+            StopPlayerTurnTimer();
 
             if (attack != null && attack.TotalOrbsCleared == 0)
             {
@@ -225,13 +270,13 @@ namespace PuzzleBattle
 
                 if (deliversBaseDamageViaProjectiles)
                 {
-                    int projectileDamage = Mathf.Max(1, Mathf.RoundToInt(match.Definition.DamagePerOrb * orbVolley.GetDamageMultiplier(orbVolleyLevel)));
+                    int projectileDamage = Mathf.Max(1, Mathf.RoundToInt((match.Definition.DamagePerOrb + _playerAttackBonus) * orbVolley.GetDamageMultiplier(orbVolleyLevel)));
                     damage = projectileDamage * match.Size;
                 }
                 else
                 {
                     float cascadeMultiplier = 1f + ((match.CascadeIndex - 1) * 0.25f);
-                    damage = Mathf.RoundToInt(match.Definition.DamagePerOrb * match.Size * cascadeMultiplier);
+                    damage = Mathf.RoundToInt((match.Definition.DamagePerOrb + _playerAttackBonus) * match.Size * cascadeMultiplier);
                     _monsterLaneController.ApplyDamage(damage, match.DisplayColor);
                 }
 
@@ -268,7 +313,7 @@ namespace PuzzleBattle
                 for (int i = 0; i < attack.Matches.Count; i++)
                 {
                     Match3BoardController.MatchResult match = attack.Matches[i];
-                    int projectileDamage = Mathf.Max(1, Mathf.RoundToInt(match.Definition.DamagePerOrb * orbVolley.GetDamageMultiplier(orbVolleyLevel)));
+                    int projectileDamage = Mathf.Max(1, Mathf.RoundToInt((match.Definition.DamagePerOrb + _playerAttackBonus) * orbVolley.GetDamageMultiplier(orbVolleyLevel)));
 
                     for (int orbIndex = 0; orbIndex < match.Size; orbIndex++)
                     {
@@ -509,6 +554,54 @@ namespace PuzzleBattle
                 }
             }
 
+            ChainLightningSkillDefinition chainLightning = GetSkillDefinition<ChainLightningSkillDefinition>(PuzzleBattleSkillId.ChainLightning);
+            int chainLightningLevel = GetSkillLevel(PuzzleBattleSkillId.ChainLightning);
+
+            if (chainLightning != null && chainLightningLevel > 0 && lightCount > 0)
+            {
+                int launchedOrbs = 0;
+                int chainCount = chainLightning.GetChainCount(chainLightningLevel);
+
+                if (lightCount >= 5)
+                {
+                    chainCount++;
+                }
+
+                for (int i = 0; i < attack.Matches.Count; i++)
+                {
+                    Match3BoardController.MatchResult match = attack.Matches[i];
+
+                    if (match.Definition == null || match.Definition.OrbId != "light")
+                    {
+                        continue;
+                    }
+
+                    for (int orbIndex = 0; orbIndex < match.Size; orbIndex++)
+                    {
+                        if (_monsterLaneController.SpawnLightningOrbProjectile(
+                            match.Definition,
+                            chainLightning.LightningEffectPrefab,
+                            match.DisplayColor,
+                            chainLightning.GetDamage(chainLightningLevel),
+                            chainCount,
+                            chainLightning.ChainDamageFalloff,
+                            chainLightning.ChainSearchRadiusCells,
+                            GetProjectileOrigin(orbIndex + (i * 17)),
+                            chainLightning.ProjectileSpeed,
+                            chainLightning.FallbackScale,
+                            chainLightning.EffectLifetime))
+                        {
+                            launchedOrbs++;
+                        }
+                    }
+                }
+
+                if (launchedOrbs > 0)
+                {
+                    triggeredSkills.Add($"{chainLightning.DisplayName} Lv.{chainLightningLevel}");
+                }
+            }
+
             SolarBeaconSkillDefinition solarBeacon = GetSkillDefinition<SolarBeaconSkillDefinition>(PuzzleBattleSkillId.SolarBeacon);
             int solarBeaconLevel = GetSkillLevel(PuzzleBattleSkillId.SolarBeacon);
 
@@ -579,11 +672,18 @@ namespace PuzzleBattle
         {
             yield return new WaitForSeconds(0.12f);
             _monsterLaneController.AdvanceTurn();
+
+            while (!_gameOver && _monsterLaneController != null && _monsterLaneController.ActiveProjectileCount > 0)
+            {
+                yield return null;
+            }
+
             _turnAdvanceRoutine = null;
 
             if (_battleActive && !_gameOver && !_skillSelectionActive)
             {
                 _boardController.SetInputEnabled(true);
+                StartPlayerTurnTimer();
             }
         }
 
@@ -618,11 +718,20 @@ namespace PuzzleBattle
 
             _roundLabel = CreateUiLabel(_topUiRoot, "RoundLabel", 34, FontStyle.Bold, TextAnchor.UpperLeft, new Color(1f, 0.97f, 0.88f, 1f));
             _timerLabel = CreateUiLabel(_topUiRoot, "TimerLabel", 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.85f, 0.92f, 1f, 0.92f));
+            _turnTimerBarRoot = CreateUiRect(_topUiRoot, "TurnTimerBar");
+            _turnTimerBarBackground = CreateUiImage(_turnTimerBarRoot, "Background", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.14f, 0.18f, 0.24f, 0.92f));
+            StretchRect(_turnTimerBarBackground.rectTransform);
+            _turnTimerBarFill = CreateUiImage(_turnTimerBarRoot, "Fill", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.38f, 0.82f, 1f, 0.96f));
             _statusLabel = CreateUiLabel(_topUiRoot, "StatusLabel", 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
             _coinHudRoot = CreateUiRect(_topUiRoot, "CoinHud");
             _coinHudIcon = CreateUiImage(_coinHudRoot, "CoinIcon", ProceduralSpriteLibrary.GetSoftCircleSprite(), new Color(1f, 0.84f, 0.22f, 0.96f));
             _coinLabel = CreateUiLabel(_coinHudRoot, "CoinLabel", 24, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.94f, 0.72f, 1f));
             _skillsLabel = CreateUiLabel(_topUiRoot, "SkillsLabel", 20, FontStyle.Bold, TextAnchor.LowerLeft, new Color(1f, 0.95f, 0.8f, 0.95f));
+            _playerHealthRoot = CreateUiRect(_topUiRoot, "PlayerHealthBar");
+            _playerHealthBarBackground = CreateUiImage(_playerHealthRoot, "Background", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.18f, 0.09f, 0.1f, 0.94f));
+            StretchRect(_playerHealthBarBackground.rectTransform);
+            _playerHealthBarFill = CreateUiImage(_playerHealthRoot, "Fill", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.92f, 0.28f, 0.24f, 0.96f));
+            _playerHealthLabel = CreateUiLabel(_playerHealthRoot, "Label", 18, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.92f, 1f));
             _comboLabel = CreateUiLabel(_uiRoot, "ComboLabel", 28, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.82f));
 
             for (int i = 0; i < 3; i++)
@@ -657,6 +766,7 @@ namespace PuzzleBattle
             _monsterLaneController.MonsterReachedPlayer += OnMonsterReachedPlayer;
             _monsterLaneController.MonsterDefeated += OnMonsterDefeated;
             _monsterLaneController.WaveCompleted += OnWaveCompleted;
+            _monsterLaneController.PlayerDamaged += OnPlayerDamaged;
         }
 
         private void LayoutScene()
@@ -831,6 +941,13 @@ namespace PuzzleBattle
             SetSkillCardsVisible(false);
             _boardController.SetInputEnabled(true);
             _monsterLaneController.StartRound(_currentRound);
+
+            if (!_monsterLaneController.IsBattleActive || _skillSelectionActive || _gameOver)
+            {
+                return;
+            }
+
+            StartPlayerTurnTimer();
             _statusText = $"Round {_currentRound} started.";
             _defaultComboText = "Each player move advances monsters by one tile.";
         }
@@ -898,30 +1015,22 @@ namespace PuzzleBattle
                 ? $"Wave {_currentRound}  |  Skill Select"
                 : $"Wave {_currentRound}";
 
-            if (_gameOver)
-            {
-                _timerLabel.text = $"Remaining Monsters {_monsterLaneController.RemainingMonsterCount}";
-            }
-            else if (_skillSelectionActive)
-            {
-                _timerLabel.text = $"Remaining Monsters {_monsterLaneController.RemainingMonsterCount}  |  Cards {_presentedChoices.Count}";
-            }
-            else if (_settingsOpen)
-            {
-                _timerLabel.text = $"Remaining Monsters {_monsterLaneController.RemainingMonsterCount}  |  Paused";
-            }
-            else if (_battleActive)
-            {
-                _timerLabel.text = $"Remaining Monsters {_monsterLaneController.RemainingMonsterCount}  |  Active {_monsterLaneController.ActiveMonsterCount}  |  Spawn Turns {_monsterLaneController.WaveTurnsRemaining}";
-            }
-            else
-            {
-                _timerLabel.text = $"Remaining Monsters {_monsterLaneController.RemainingMonsterCount}  |  Preparing";
-            }
+            _timerLabel.text = _turnTimerActive
+                ? $"Time {Mathf.Max(0f, _turnTimeRemaining):0.0}s"
+                : _skillSelectionActive
+                    ? "Time Ready"
+                    : _settingsOpen
+                        ? "Time Paused"
+                        : _gameOver
+                            ? "Time Ended"
+                            : "Time Waiting";
 
-            _statusLabel.text = _statusText;
+            _statusLabel.text = $"{_statusText}  |  Remain {_monsterLaneController.RemainingMonsterCount}  |  Active {_monsterLaneController.ActiveMonsterCount}  |  Spawn {_monsterLaneController.WaveTurnsRemaining}";
             _coinLabel.text = $"\uCF54\uC778 {_coins}";
-            _skillsLabel.text = "획득 스킬";
+            _skillsLabel.text = $"Status  ATK +{_playerAttackBonus}  |  HP {_playerCurrentHealth}/{_playerMaxHealth}";
+            _playerHealthLabel.text = $"HP {_playerCurrentHealth}/{_playerMaxHealth}";
+            UpdateBarFill(_turnTimerBarFill.rectTransform, _turnTimerActive ? _turnTimeRemaining / PlayerTurnDurationSeconds : 0f);
+            UpdateBarFill(_playerHealthBarFill.rectTransform, _playerCurrentHealth / (float)Mathf.Max(1, _playerMaxHealth));
             UpdateAcquiredSkillIcons();
             UpdateHudButtons();
 
@@ -929,6 +1038,75 @@ namespace PuzzleBattle
             {
                 _comboLabel.text = _defaultComboText;
             }
+        }
+
+        private void UpdateTurnTimer()
+        {
+            if (!_turnTimerActive || !_battleActive || _gameOver || _skillSelectionActive || _settingsOpen)
+            {
+                return;
+            }
+
+            _turnTimeRemaining = Mathf.Max(0f, _turnTimeRemaining - Time.deltaTime);
+
+            if (_turnTimeRemaining > 0f)
+            {
+                return;
+            }
+
+            HandleTurnTimeout();
+        }
+
+        private void StartPlayerTurnTimer()
+        {
+            _turnTimeRemaining = PlayerTurnDurationSeconds;
+            _turnTimerActive = true;
+        }
+
+        private void StopPlayerTurnTimer()
+        {
+            _turnTimerActive = false;
+        }
+
+        private void HandleTurnTimeout()
+        {
+            if (!_battleActive || _gameOver || _skillSelectionActive || _settingsOpen || _turnAdvanceRoutine != null)
+            {
+                return;
+            }
+
+            StopPlayerTurnTimer();
+            _statusText = $"Round {_currentRound}: time over, monsters advanced.";
+            _defaultComboText = "Turn skipped.";
+            _boardController.SetInputEnabled(false);
+            _turnAdvanceRoutine = StartCoroutine(AdvanceMonsterTurnRoutine());
+        }
+
+        private void OnPlayerDamaged(int damage, Vector3 worldPosition)
+        {
+            if (_gameOver)
+            {
+                return;
+            }
+
+            _playerCurrentHealth = Mathf.Max(0, _playerCurrentHealth - Mathf.Max(0, damage));
+            _statusText = $"Player took {damage} damage.";
+
+            if (_playerCurrentHealth > 0)
+            {
+                return;
+            }
+
+            StopPlayerTurnTimer();
+            _battleActive = false;
+            _gameOver = true;
+            _skillSelectionActive = false;
+            _boardController.SetInputEnabled(false);
+            _monsterLaneController.SetBattleActive(false);
+            _monsterLaneController.ClearTransientEffects();
+            SetSkillCardsVisible(false);
+            _statusText = "Player HP reached 0.";
+            _defaultComboText = "Run ended.";
         }
 
         private void SpawnCoinDrops(Vector3 worldPosition, int totalValue)
@@ -948,9 +1126,11 @@ namespace PuzzleBattle
                 int coinValue = Mathf.Max(1, Mathf.CeilToInt(remainingValue / (float)slotsLeft));
                 remainingValue -= coinValue;
 
-                RectTransform root = CreateUiRect(_uiRoot, $"CoinPickup_{_coinPickups.Count}");
-                Image icon = CreateUiImage(root, "Icon", ProceduralSpriteLibrary.GetSoftCircleSprite(), new Color(1f, 0.83f, 0.18f, 0.96f));
-                StretchRect(icon.rectTransform);
+                CoinPickupVisual coinVisual = GetCoinPickupVisualFromPool();
+                RectTransform root = coinVisual.Root;
+                Image icon = coinVisual.Icon;
+                root.name = $"CoinPickup_{_coinPickups.Count}";
+                icon.color = new Color(1f, 0.83f, 0.18f, 0.96f);
                 SetRectTransform(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24f, 24f));
 
                 Vector2 startLocal = WorldToCanvasLocal(worldPosition + new Vector3(Random.Range(-0.12f, 0.12f), Random.Range(0.02f, 0.08f), 0f));
@@ -958,20 +1138,51 @@ namespace PuzzleBattle
                 Vector2 controlLocal = ((startLocal + endLocal) * 0.5f) + new Vector2(Random.Range(-24f, 24f), Random.Range(54f, 102f));
 
                 root.anchoredPosition = startLocal;
-                _coinPickups.Add(new CoinPickupVisual
-                {
-                    Root = root,
-                    Icon = icon,
-                    Value = coinValue,
-                    State = CoinPickupState.Dropping,
-                    StartLocal = startLocal,
-                    ControlLocal = controlLocal,
-                    EndLocal = endLocal,
-                    Progress = 0f,
-                    Duration = Random.Range(0.32f, 0.46f),
-                    ReadyAt = 0f
-                });
+                root.localScale = Vector3.one;
+                coinVisual.Value = coinValue;
+                coinVisual.IsHealthPickup = false;
+                coinVisual.State = CoinPickupState.Dropping;
+                coinVisual.StartLocal = startLocal;
+                coinVisual.ControlLocal = controlLocal;
+                coinVisual.EndLocal = endLocal;
+                coinVisual.Progress = 0f;
+                coinVisual.Duration = Random.Range(0.32f, 0.46f);
+                coinVisual.ReadyAt = 0f;
+                _coinPickups.Add(coinVisual);
             }
+        }
+
+        private void SpawnHealthPickup(Vector3 worldPosition, int healAmount)
+        {
+            if (_uiRoot == null || healAmount <= 0)
+            {
+                _playerCurrentHealth = Mathf.Min(_playerMaxHealth, _playerCurrentHealth + Mathf.Max(0, healAmount));
+                return;
+            }
+
+            CoinPickupVisual coinVisual = GetCoinPickupVisualFromPool();
+            RectTransform root = coinVisual.Root;
+            Image icon = coinVisual.Icon;
+            root.name = $"HealthPickup_{_coinPickups.Count}";
+            icon.color = new Color(0.32f, 0.96f, 0.52f, 0.98f);
+            SetRectTransform(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(26f, 26f));
+
+            Vector2 startLocal = WorldToCanvasLocal(worldPosition + new Vector3(Random.Range(-0.08f, 0.08f), Random.Range(0.04f, 0.12f), 0f));
+            Vector2 endLocal = startLocal + new Vector2(Random.Range(-48f, 48f), Random.Range(-82f, -42f));
+            Vector2 controlLocal = ((startLocal + endLocal) * 0.5f) + new Vector2(Random.Range(-16f, 16f), Random.Range(48f, 90f));
+
+            root.anchoredPosition = startLocal;
+            root.localScale = Vector3.one;
+            coinVisual.Value = healAmount;
+            coinVisual.IsHealthPickup = true;
+            coinVisual.State = CoinPickupState.Dropping;
+            coinVisual.StartLocal = startLocal;
+            coinVisual.ControlLocal = controlLocal;
+            coinVisual.EndLocal = endLocal;
+            coinVisual.Progress = 0f;
+            coinVisual.Duration = Random.Range(0.32f, 0.46f);
+            coinVisual.ReadyAt = 0f;
+            _coinPickups.Add(coinVisual);
         }
 
         private void UpdateCoinPickups()
@@ -1012,7 +1223,7 @@ namespace PuzzleBattle
                             coin.Progress = 0f;
                             coin.Duration = Random.Range(0.34f, 0.48f);
                             coin.StartLocal = coin.Root.anchoredPosition;
-                            coin.EndLocal = GetCoinHudTargetLocal();
+                            coin.EndLocal = coin.IsHealthPickup ? GetHealthHudTargetLocal() : GetCoinHudTargetLocal();
                             coin.ControlLocal = ((coin.StartLocal + coin.EndLocal) * 0.5f) + new Vector2(Random.Range(-56f, 56f), Random.Range(78f, 132f));
                         }
                         break;
@@ -1027,14 +1238,70 @@ namespace PuzzleBattle
 
                         if (collectT >= 1f)
                         {
-                            _coins += coin.Value;
-                            PulseCoinHud();
-                            Destroy(coin.Root.gameObject);
+                            if (coin.IsHealthPickup)
+                            {
+                                _playerCurrentHealth = Mathf.Min(_playerMaxHealth, _playerCurrentHealth + coin.Value);
+                            }
+                            else
+                            {
+                                _coins += coin.Value;
+                                PulseCoinHud();
+                            }
+
+                            ReleaseCoinPickupVisual(coin);
                             _coinPickups.RemoveAt(i);
                         }
                         break;
                 }
             }
+        }
+
+        private CoinPickupVisual GetCoinPickupVisualFromPool()
+        {
+            if (_coinPickupPool == null)
+            {
+                _coinPickupPool = new SimplePool<CoinPickupVisual>(
+                    () =>
+                    {
+                        RectTransform root = CreateUiRect(_uiRoot, "CoinPickup");
+                        Image icon = CreateUiImage(root, "Icon", ProceduralSpriteLibrary.GetSoftCircleSprite(), Color.white);
+                        StretchRect(icon.rectTransform);
+                        root.gameObject.SetActive(false);
+                        return new CoinPickupVisual
+                        {
+                            Root = root,
+                            Icon = icon
+                        };
+                    },
+                    visual =>
+                    {
+                        visual.Root.SetParent(_uiRoot, false);
+                        visual.Root.gameObject.SetActive(true);
+                        visual.Root.localScale = Vector3.one;
+                    },
+                    visual =>
+                    {
+                        visual.Root.gameObject.SetActive(false);
+                    });
+            }
+
+            return _coinPickupPool.Get();
+        }
+
+        private void ReleaseCoinPickupVisual(CoinPickupVisual coin)
+        {
+            if (coin == null)
+            {
+                return;
+            }
+
+            if (_coinPickupPool == null)
+            {
+                coin.Root.gameObject.SetActive(false);
+                return;
+            }
+
+            _coinPickupPool.Release(coin);
         }
 
         private bool CanCollectDroppedCoins()
@@ -1062,6 +1329,19 @@ namespace PuzzleBattle
             }
 
             Vector3 worldCenter = _coinHudIcon.rectTransform.TransformPoint(_coinHudIcon.rectTransform.rect.center);
+            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(null, worldCenter);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_uiRoot, screenPoint, null, out Vector2 localPoint);
+            return localPoint;
+        }
+
+        private Vector2 GetHealthHudTargetLocal()
+        {
+            if (_uiRoot == null || _playerHealthRoot == null)
+            {
+                return Vector2.zero;
+            }
+
+            Vector3 worldCenter = _playerHealthRoot.TransformPoint(_playerHealthRoot.rect.center);
             Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(null, worldCenter);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_uiRoot, screenPoint, null, out Vector2 localPoint);
             return localPoint;
@@ -1233,10 +1513,16 @@ namespace PuzzleBattle
                     return poisonNeedles.EffectPrefab;
                 case LightningStrikeSkillDefinition lightning:
                     return lightning.LightningEffectPrefab;
+                case ChainLightningSkillDefinition chainLightning:
+                    return chainLightning.LightningEffectPrefab;
                 case SolarBeaconSkillDefinition solarBeacon:
                     return solarBeacon.EffectPrefab;
                 case CharmingHeartSkillDefinition charm:
                     return charm.CharmEffectPrefab;
+                case DeathBeamSkillDefinition deathBeam:
+                    return deathBeam.EffectPrefab;
+                case DeathBombSkillDefinition deathBomb:
+                    return deathBomb.EffectPrefab;
                 default:
                     return null;
             }
@@ -1282,6 +1568,10 @@ namespace PuzzleBattle
                     sprite = ProceduralSpriteLibrary.GetSquareSprite();
                     tint = lightning.AccentColor;
                     break;
+                case ChainLightningSkillDefinition chainLightning:
+                    sprite = ProceduralSpriteLibrary.GetOrbSprite();
+                    tint = chainLightning.AccentColor;
+                    break;
                 case SolarBeaconSkillDefinition solarBeacon:
                     sprite = ProceduralSpriteLibrary.GetSoftCircleSprite();
                     tint = solarBeacon.AccentColor;
@@ -1289,6 +1579,14 @@ namespace PuzzleBattle
                 case CharmingHeartSkillDefinition charm:
                     sprite = ProceduralSpriteLibrary.GetSoftCircleSprite();
                     tint = charm.AccentColor;
+                    break;
+                case DeathBeamSkillDefinition deathBeam:
+                    sprite = ProceduralSpriteLibrary.GetSquareSprite();
+                    tint = deathBeam.AccentColor;
+                    break;
+                case DeathBombSkillDefinition deathBomb:
+                    sprite = ProceduralSpriteLibrary.GetSoftCircleSprite();
+                    tint = deathBomb.AccentColor;
                     break;
                 default:
                     sprite = ProceduralSpriteLibrary.GetOrbSprite();
@@ -1466,7 +1764,7 @@ namespace PuzzleBattle
             float spacing = totalIcons > 1 ? Mathf.Clamp(availableWidth / (totalIcons * 10f), 8f, 14f) : 0f;
             float iconSize = Mathf.Clamp((availableWidth - (spacing * Mathf.Max(0, totalIcons - 1))) / totalIcons, 44f, 70f);
             float startX = 28f + (iconSize * 0.5f);
-            float centerY = 42f;
+            float centerY = 56f;
 
             for (int i = 0; i < _skillIcons.Count; i++)
             {
@@ -1567,8 +1865,11 @@ namespace PuzzleBattle
                 PuzzleBattleSkillId.BatSwarm,
                 PuzzleBattleSkillId.PoisonNeedles,
                 PuzzleBattleSkillId.LightningStrike,
+                PuzzleBattleSkillId.ChainLightning,
                 PuzzleBattleSkillId.SolarBeacon,
-                PuzzleBattleSkillId.CharmingHeart
+                PuzzleBattleSkillId.CharmingHeart,
+                PuzzleBattleSkillId.DeathBeam,
+                PuzzleBattleSkillId.DeathBomb
             };
 
             for (int i = 0; i < allSkillIds.Length; i++)
@@ -1659,6 +1960,10 @@ namespace PuzzleBattle
                     LightningStrikeSkillDefinition lightning = ScriptableObject.CreateInstance<LightningStrikeSkillDefinition>();
                     lightning.SetRuntimeDefaults();
                     return lightning;
+                case PuzzleBattleSkillId.ChainLightning:
+                    ChainLightningSkillDefinition chainLightning = ScriptableObject.CreateInstance<ChainLightningSkillDefinition>();
+                    chainLightning.SetRuntimeDefaults();
+                    return chainLightning;
                 case PuzzleBattleSkillId.SolarBeacon:
                     SolarBeaconSkillDefinition solarBeacon = ScriptableObject.CreateInstance<SolarBeaconSkillDefinition>();
                     solarBeacon.SetRuntimeDefaults();
@@ -1667,8 +1972,53 @@ namespace PuzzleBattle
                     CharmingHeartSkillDefinition charm = ScriptableObject.CreateInstance<CharmingHeartSkillDefinition>();
                     charm.SetRuntimeDefaults();
                     return charm;
+                case PuzzleBattleSkillId.DeathBeam:
+                    DeathBeamSkillDefinition deathBeam = ScriptableObject.CreateInstance<DeathBeamSkillDefinition>();
+                    deathBeam.SetRuntimeDefaults();
+                    return deathBeam;
+                case PuzzleBattleSkillId.DeathBomb:
+                    DeathBombSkillDefinition deathBomb = ScriptableObject.CreateInstance<DeathBombSkillDefinition>();
+                    deathBomb.SetRuntimeDefaults();
+                    return deathBomb;
                 default:
                     return null;
+            }
+        }
+
+        private void ApplyDeathTriggeredSkills(Vector3 worldPosition)
+        {
+            if (_monsterLaneController == null)
+            {
+                return;
+            }
+
+            DeathBeamSkillDefinition deathBeam = GetSkillDefinition<DeathBeamSkillDefinition>(PuzzleBattleSkillId.DeathBeam);
+            int deathBeamLevel = GetSkillLevel(PuzzleBattleSkillId.DeathBeam);
+
+            if (deathBeam != null && deathBeamLevel > 0)
+            {
+                _monsterLaneController.ApplyRowDamageAtWorldPosition(
+                    worldPosition,
+                    deathBeam.GetDamage(deathBeamLevel),
+                    deathBeam.AccentColor,
+                    deathBeam.EffectPrefab,
+                    deathBeam.FallbackScale,
+                    deathBeam.EffectLifetime);
+            }
+
+            DeathBombSkillDefinition deathBomb = GetSkillDefinition<DeathBombSkillDefinition>(PuzzleBattleSkillId.DeathBomb);
+            int deathBombLevel = GetSkillLevel(PuzzleBattleSkillId.DeathBomb);
+
+            if (deathBomb != null && deathBombLevel > 0)
+            {
+                _monsterLaneController.ApplyAreaDamageAtWorldPosition(
+                    worldPosition,
+                    deathBomb.GetRadius(deathBombLevel),
+                    deathBomb.GetDamage(deathBombLevel),
+                    deathBomb.AccentColor,
+                    deathBomb.EffectPrefab,
+                    deathBomb.FallbackScale,
+                    deathBomb.EffectLifetime);
             }
         }
 
@@ -1724,6 +2074,20 @@ namespace PuzzleBattle
             }
 
             profile = ScriptableObject.CreateInstance<MonsterWaveProfile>();
+            profile.SetRuntimeDefaults();
+            return profile;
+        }
+
+        private PlayerStatusProfile LoadPlayerStatusProfile()
+        {
+            PlayerStatusProfile profile = Resources.Load<PlayerStatusProfile>("PuzzleBattle/PlayerStatusProfile");
+
+            if (profile != null)
+            {
+                return profile;
+            }
+
+            profile = ScriptableObject.CreateInstance<PlayerStatusProfile>();
             profile.SetRuntimeDefaults();
             return profile;
         }
@@ -1927,6 +2291,11 @@ namespace PuzzleBattle
             EnsureEventSystem();
             _uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
+            if (TryUseExternalCanvasHost())
+            {
+                return;
+            }
+
             GameObject canvasObject = new GameObject("PuzzleBattleCanvas");
             canvasObject.transform.SetParent(transform, false);
             _uiCanvas = canvasObject.AddComponent<Canvas>();
@@ -1947,6 +2316,45 @@ namespace PuzzleBattle
             SetAnchorStretch(_topUiRoot, new Vector2(0f, 0.5f), Vector2.one);
 
             _cardAreaRoot = CreateUiRect(_uiRoot, "SkillCardArea");
+        }
+
+        private bool TryUseExternalCanvasHost()
+        {
+            if (_canvasHost == null || _canvasHost.Canvas == null)
+            {
+                return false;
+            }
+
+            _uiCanvas = _canvasHost.Canvas;
+            _uiRoot = _canvasHost.UiRoot != null
+                ? _canvasHost.UiRoot
+                : _uiCanvas.GetComponent<RectTransform>();
+
+            if (_uiRoot == null)
+            {
+                return false;
+            }
+
+            _topUiRoot = _canvasHost.TopUiRoot;
+            _cardAreaRoot = _canvasHost.CardAreaRoot;
+
+            if (_topUiRoot == null && _canvasHost.CreateMissingRoots)
+            {
+                _topUiRoot = CreateUiRect(_uiRoot, "TopUIRoot");
+            }
+
+            if (_cardAreaRoot == null && _canvasHost.CreateMissingRoots)
+            {
+                _cardAreaRoot = CreateUiRect(_uiRoot, "SkillCardArea");
+            }
+
+            if (_topUiRoot == null || _cardAreaRoot == null)
+            {
+                return false;
+            }
+
+            SetAnchorStretch(_topUiRoot, new Vector2(0f, 0.5f), Vector2.one);
+            return true;
         }
 
         private void EnsureEventSystem()
@@ -1971,12 +2379,15 @@ namespace PuzzleBattle
 
             SetAnchorStretch(_topUiRoot, new Vector2(0f, 0.5f), Vector2.one);
             SetRectTransform(_roundLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -18f), new Vector2(640f, 42f));
-            SetRectTransform(_timerLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -56f), new Vector2(840f, 30f));
-            SetRectTransform(_statusLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -92f), new Vector2(980f, 30f));
+            SetRectTransform(_timerLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -56f), new Vector2(220f, 30f));
+            SetRectTransform(_turnTimerBarRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -82f), new Vector2(360f, 18f));
+            SetRectTransform(_statusLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(28f, -108f), new Vector2(-268f, 34f));
             SetRectTransform(_coinHudRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(482f, -18f), new Vector2(220f, 42f));
             SetRectTransform(_coinHudIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(30f, 30f));
             SetRectTransform(_coinLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(170f, 36f));
-            SetRectTransform(_skillsLabel.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(26f, 12f), new Vector2(240f, 24f));
+            SetRectTransform(_skillsLabel.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(26f, 44f), new Vector2(240f, 24f));
+            SetRectTransform(_playerHealthRoot, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(-52f, 24f));
+            SetRectTransform(_playerHealthLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             SetRectTransform(_comboLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(760f, 36f));
 
             Rect viewportRect = WorldRectToViewportRect(_monsterRegion);
@@ -2038,6 +2449,21 @@ namespace PuzzleBattle
             rectTransform.pivot = pivot;
             rectTransform.anchoredPosition = anchoredPosition;
             rectTransform.sizeDelta = sizeDelta;
+        }
+
+        private static void UpdateBarFill(RectTransform fillRect, float normalized)
+        {
+            if (fillRect == null)
+            {
+                return;
+            }
+
+            float clamped = Mathf.Clamp01(normalized);
+            fillRect.anchorMin = new Vector2(0f, 0f);
+            fillRect.anchorMax = new Vector2(clamped, 1f);
+            fillRect.pivot = new Vector2(0f, 0.5f);
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
         }
 
         private Rect WorldRectToViewportRect(Rect worldRect)

@@ -19,6 +19,11 @@ namespace PuzzleBattle
             public MonsterView View;
             public int Lane;
             public int Row;
+            public int WidthCells;
+            public int HeightCells;
+            public bool IsBoss;
+            public bool IsRanged;
+            public int RangedDamage;
             public int CoinReward;
             public float StepCharge;
             public bool IsDefeated;
@@ -74,16 +79,38 @@ namespace PuzzleBattle
             public float TravelDuration;
             public float CurveSide;
             public float CurveLift;
+            public int ChainRemaining;
+            public float ChainDamageFalloff;
+            public float ChainSearchRadiusCells;
+            public GameObject ImpactEffectPrefab;
+            public float ImpactFallbackScale;
+            public float ImpactEffectLifetime;
+            public List<MonsterInstance> HitHistory;
+        }
+
+        private sealed class EnemyProjectileInstance
+        {
+            public Transform VisualRoot;
+            public Vector3 Position;
+            public Vector3 CurveStart;
+            public Vector3 CurveControl;
+            public Vector3 TargetPosition;
+            public float TravelProgress;
+            public float TravelDuration;
+            public int Damage;
         }
 
         public event System.Action MonsterReachedPlayer;
         public event System.Action WaveCompleted;
-        public event System.Action<Vector3, int> MonsterDefeated;
+        public event System.Action<Vector3, int, bool> MonsterDefeated;
+        public event System.Action<int, Vector3> PlayerDamaged;
 
         private readonly List<MonsterInstance> _monsters = new List<MonsterInstance>();
         private readonly List<HazardInstance> _hazards = new List<HazardInstance>();
         private readonly List<ProjectileInstance> _projectiles = new List<ProjectileInstance>();
+        private readonly List<EnemyProjectileInstance> _enemyProjectiles = new List<EnemyProjectileInstance>();
         private readonly List<SpriteRenderer> _gridLines = new List<SpriteRenderer>();
+        private SimplePool<MonsterView> _monsterViewPool;
         private MonsterWaveProfile _profile;
         private Rect _region;
         private SpriteRenderer _backdrop;
@@ -102,7 +129,22 @@ namespace PuzzleBattle
         public int RemainingMonsterCount => ActiveMonsterCount + (WaveTurnsRemaining * GetSpawnsPerTurnForCurrentRound());
         public bool IsBattleActive => _battleActive;
         public int ColumnCount => Mathf.Max(1, _profile != null ? _profile.LaneCount : 0);
-        public int ActiveProjectileCount => _projectiles.Count;
+        public int ActiveProjectileCount => _projectiles.Count + _enemyProjectiles.Count;
+        public bool HasLivingBoss
+        {
+            get
+            {
+                for (int i = 0; i < _monsters.Count; i++)
+                {
+                    if (!_monsters[i].IsDefeated && _monsters[i].IsBoss)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
 
         private int Columns => Mathf.Max(1, _profile != null ? _profile.LaneCount : 0);
         private int Rows => _profile != null ? _profile.BattlefieldRows : 0;
@@ -125,10 +167,26 @@ namespace PuzzleBattle
         public void StartRound(int round)
         {
             _currentRound = Mathf.Max(1, round);
-            _spawnTurnsRemaining = GetSpawnTurnsForCurrentRound();
             _battleActive = true;
             ClearAllEffects();
             ClearLiveMonsters();
+
+            if (_currentRound == _profile.FinalRound - 1)
+            {
+                _spawnTurnsRemaining = 0;
+                _battleActive = false;
+                WaveCompleted?.Invoke();
+                return;
+            }
+
+            if (_currentRound >= _profile.FinalRound)
+            {
+                _spawnTurnsRemaining = 0;
+                SpawnBossMonster();
+                return;
+            }
+
+            _spawnTurnsRemaining = GetSpawnTurnsForCurrentRound();
 
             if (_spawnTurnsRemaining > 0)
             {
@@ -169,6 +227,9 @@ namespace PuzzleBattle
 
             TriggerContactHazards();
             TickHazards();
+
+            ProcessBossTurn();
+            FireRangedMonsterAttacks();
 
             if (_spawnTurnsRemaining > 0)
             {
@@ -275,6 +336,79 @@ namespace PuzzleBattle
                 4);
         }
 
+        public bool SpawnLightningOrbProjectile(
+            OrbVisualDefinition definition,
+            GameObject impactEffectPrefab,
+            Color tint,
+            int damage,
+            int chainCount,
+            float chainDamageFalloff,
+            float chainSearchRadiusCells,
+            Vector3 origin,
+            float speed,
+            float fallbackScale,
+            float effectLifetime)
+        {
+            GameObject projectileEffectPrefab = definition != null && definition.ProjectileEffectPrefab != null
+                ? definition.ProjectileEffectPrefab
+                : null;
+            Vector3 targetScale = Vector3.one * CellSize * Mathf.Max(0.05f, fallbackScale);
+            MonsterInstance target = GetRandomActiveMonster();
+
+            if (target == null)
+            {
+                return false;
+            }
+
+            Transform visualRoot = CreateEffectVisual(
+                "LightningOrb",
+                transform,
+                projectileEffectPrefab,
+                92,
+                ProceduralSpriteLibrary.GetOrbSprite(),
+                tint,
+                out SpriteRenderer fallbackRenderer,
+                out Vector3 visualBaseScale);
+
+            visualRoot.position = origin;
+            ApplyVisualScale(visualRoot, visualBaseScale, targetScale);
+
+            ProjectileInstance projectile = new ProjectileInstance
+            {
+                VisualRoot = visualRoot,
+                FallbackRenderer = fallbackRenderer,
+                VisualBaseScale = visualBaseScale,
+                Target = target,
+                Position = origin,
+                Speed = Mathf.Max(0.5f, speed),
+                Damage = Mathf.Max(1, damage),
+                DotDamagePerTurn = 0,
+                DotTurns = 0,
+                AdditiveDot = false,
+                SlowMultiplier = 1f,
+                SlowTurns = 0,
+                RetargetFrontCount = 1,
+                Tint = tint,
+                CurveStart = origin,
+                CachedTargetPosition = target.View.transform.position + (Vector3.up * 0.05f),
+                TravelProgress = 0f,
+                TravelDuration = 0f,
+                CurveSide = Random.value < 0.5f ? -1f : 1f,
+                CurveLift = Random.Range(CellSize * 0.12f, CellSize * 0.34f),
+                ChainRemaining = Mathf.Max(0, chainCount),
+                ChainDamageFalloff = Mathf.Clamp(chainDamageFalloff, 0.2f, 0.95f),
+                ChainSearchRadiusCells = Mathf.Max(0.5f, chainSearchRadiusCells),
+                ImpactEffectPrefab = impactEffectPrefab,
+                ImpactFallbackScale = Mathf.Max(0.05f, fallbackScale),
+                ImpactEffectLifetime = Mathf.Max(0.05f, effectLifetime),
+                HitHistory = new List<MonsterInstance>()
+            };
+
+            _projectiles.Add(projectile);
+            RebuildProjectileCurve(projectile, origin, projectile.CachedTargetPosition);
+            return true;
+        }
+
         public int StrikeRandomEnemies(int strikeCount, int damage, Color tint, GameObject effectPrefab, float fallbackScale, float effectLifetime)
         {
             List<MonsterInstance> targets = GetRandomActiveMonsters(strikeCount);
@@ -336,6 +470,78 @@ namespace PuzzleBattle
             }
 
             return applied;
+        }
+
+        public int ApplyRowDamageAtWorldPosition(Vector3 worldPosition, int damage, Color tint, GameObject effectPrefab, float fallbackScale, float effectLifetime)
+        {
+            if (_profile == null)
+            {
+                return 0;
+            }
+
+            int row = Mathf.Clamp(WorldToRow(worldPosition), 0, Mathf.Max(0, Rows - 1));
+            float centerLane = Mathf.Max(0f, (Columns - 1) * 0.5f);
+            Vector3 effectPosition = CellToWorld(centerLane, row);
+            float width = Mathf.Max(CellSize, _cellWidth * Mathf.Max(1, Columns) * Mathf.Max(0.2f, fallbackScale));
+
+            SpawnOneShotEffect(
+                "DeathBeam",
+                effectPosition,
+                effectPrefab,
+                89,
+                ProceduralSpriteLibrary.GetSquareSprite(),
+                tint,
+                new Vector3(width, CellSize * Mathf.Max(0.16f, fallbackScale * 0.22f), 1f),
+                effectLifetime);
+
+            int hits = 0;
+
+            for (int i = _monsters.Count - 1; i >= 0; i--)
+            {
+                MonsterInstance monster = _monsters[i];
+
+                if (monster == null || monster.IsDefeated)
+                {
+                    continue;
+                }
+
+                int minRow = monster.Row;
+                int maxRow = monster.Row + Mathf.Max(1, monster.HeightCells) - 1;
+
+                if (row < minRow || row > maxRow)
+                {
+                    continue;
+                }
+
+                ApplyDamageToMonster(monster, damage, tint);
+                hits++;
+            }
+
+            return hits;
+        }
+
+        public int ApplyAreaDamageAtWorldPosition(Vector3 worldPosition, float radiusCells, int damage, Color tint, GameObject effectPrefab, float fallbackScale, float effectLifetime)
+        {
+            if (_profile == null)
+            {
+                return 0;
+            }
+
+            float lane = WorldToLane(worldPosition);
+            int row = Mathf.Clamp(WorldToRow(worldPosition), 0, Mathf.Max(0, Rows - 1));
+            float diameter = CellSize * Mathf.Max(0.35f, radiusCells) * 2f * Mathf.Max(0.05f, fallbackScale);
+
+            SpawnOneShotEffect(
+                "DeathBomb",
+                worldPosition,
+                effectPrefab,
+                90,
+                ProceduralSpriteLibrary.GetSoftCircleSprite(),
+                tint,
+                Vector3.one * diameter,
+                effectLifetime);
+
+            return ApplyAreaDamage(lane, row, radiusCells, damage, tint);
         }
 
         public void SpawnFrostWell(float radiusCells, int damagePerTurn, float slowMultiplier, int durationTurns, GameObject effectPrefab)
@@ -549,6 +755,7 @@ namespace PuzzleBattle
         private void Update()
         {
             UpdateProjectiles();
+            UpdateEnemyProjectiles();
 
             for (int i = 0; i < _hazards.Count; i++)
             {
@@ -637,14 +844,13 @@ namespace PuzzleBattle
 
         private void ApplyDotDamage()
         {
-            List<MonsterInstance> currentMonsters = new List<MonsterInstance>(_monsters);
             Color dotTint = new Color(0.42f, 0.9f, 0.42f, 1f);
 
-            for (int i = 0; i < currentMonsters.Count; i++)
+            for (int i = _monsters.Count - 1; i >= 0; i--)
             {
-                MonsterInstance monster = currentMonsters[i];
+                MonsterInstance monster = _monsters[i];
 
-                if (monster == null || monster.IsDefeated || !_monsters.Contains(monster) || monster.DotTurnsRemaining <= 0)
+                if (monster == null || monster.IsDefeated || monster.DotTurnsRemaining <= 0)
                 {
                     continue;
                 }
@@ -665,13 +871,11 @@ namespace PuzzleBattle
 
         private void ApplyHazardDamageForCurrentCells()
         {
-            List<MonsterInstance> currentMonsters = new List<MonsterInstance>(_monsters);
-
-            for (int i = 0; i < currentMonsters.Count; i++)
+            for (int i = _monsters.Count - 1; i >= 0; i--)
             {
-                MonsterInstance monster = currentMonsters[i];
+                MonsterInstance monster = _monsters[i];
 
-                if (monster == null || monster.IsDefeated || !_monsters.Contains(monster))
+                if (monster == null || monster.IsDefeated)
                 {
                     continue;
                 }
@@ -712,9 +916,8 @@ namespace PuzzleBattle
 
                     if (desiredRow < 0)
                     {
-                        _battleActive = false;
-                        MonsterReachedPlayer?.Invoke();
-                        return;
+                        HandleMonsterEscape(monster);
+                        continue;
                     }
 
                     int finalRow = desiredRow;
@@ -735,6 +938,11 @@ namespace PuzzleBattle
         private int GetStepCountForTurn(MonsterInstance monster)
         {
             if (monster == null || monster.IsDefeated)
+            {
+                return 0;
+            }
+
+            if (monster.IsBoss)
             {
                 return 0;
             }
@@ -843,20 +1051,21 @@ namespace PuzzleBattle
 
         private int ApplyAreaDamage(float centerLane, int row, float radiusCells, int damage, Color tint)
         {
-            List<MonsterInstance> targets = new List<MonsterInstance>(_monsters);
             int hits = 0;
 
-            for (int i = 0; i < targets.Count; i++)
+            for (int i = _monsters.Count - 1; i >= 0; i--)
             {
-                MonsterInstance monster = targets[i];
+                MonsterInstance monster = _monsters[i];
 
-                if (monster == null || monster.IsDefeated || !_monsters.Contains(monster))
+                if (monster == null || monster.IsDefeated)
                 {
                     continue;
                 }
 
-                float laneDistance = Mathf.Abs(monster.Lane - centerLane);
-                float rowDistance = Mathf.Abs(monster.Row - row);
+                float monsterCenterLane = monster.Lane + ((Mathf.Max(1, monster.WidthCells) - 1) * 0.5f);
+                float monsterCenterRow = monster.Row + ((Mathf.Max(1, monster.HeightCells) - 1) * 0.5f);
+                float laneDistance = Mathf.Abs(monsterCenterLane - centerLane);
+                float rowDistance = Mathf.Abs(monsterCenterRow - row);
 
                 if (Mathf.Sqrt((laneDistance * laneDistance) + (rowDistance * rowDistance)) > radiusCells)
                 {
@@ -893,17 +1102,25 @@ namespace PuzzleBattle
         private void SpawnMonsterInLane(int lane)
         {
             int health = _profile.BaseHealth + ((_currentRound - 1) * _profile.RoundHealthIncrease) + Random.Range(0, _profile.HealthVariance + 1);
-            GameObject monsterObject = new GameObject($"Monster_{_spawnSequence:000}");
-            monsterObject.transform.SetParent(transform, false);
-
-            MonsterView view = monsterObject.AddComponent<MonsterView>();
-            view.Initialize($"R{_currentRound} #{_spawnSequence + 1}", health, _cellWidth * 0.76f, _cellHeight * 0.72f, _profile.MonsterTint);
+            bool isRanged = Random.value < _profile.RangedMonsterChance;
+            MonsterView view = GetMonsterViewFromPool($"Monster_{_spawnSequence:000}");
+            view.Initialize(
+                isRanged ? $"A{_currentRound} #{_spawnSequence + 1}" : $"R{_currentRound} #{_spawnSequence + 1}",
+                health,
+                _cellWidth * 0.76f,
+                _cellHeight * 0.72f,
+                isRanged ? _profile.RangedMonsterTint : _profile.MonsterTint);
 
             MonsterInstance instance = new MonsterInstance
             {
                 View = view,
                 Lane = lane,
                 Row = Rows - 1,
+                WidthCells = 1,
+                HeightCells = 1,
+                IsBoss = false,
+                IsRanged = isRanged,
+                RangedDamage = GetRangedDamageForCurrentRound(),
                 CoinReward = GetCoinRewardForCurrentRound(),
                 StepCharge = 0f,
                 IsDefeated = false,
@@ -924,6 +1141,75 @@ namespace PuzzleBattle
             view.SetSortingOrder(70 + ((Rows - instance.Row) * 4));
             StartCoroutine(AnimateMonsterSpawn(instance, spawnPosition, targetPosition));
             _spawnSequence++;
+        }
+
+        private void SpawnBossMonster()
+        {
+            int maxLane = Mathf.Max(0, Columns - _profile.BossWidthCells);
+            int maxRow = Mathf.Max(0, Rows - _profile.BossHeightCells);
+            int lane = Random.Range(0, maxLane + 1);
+            int row = Random.Range(Mathf.Max(0, Rows / 2), maxRow + 1);
+
+            MonsterView view = GetMonsterViewFromPool($"Boss_{_spawnSequence:000}");
+            view.Initialize(
+                "BOSS",
+                _profile.BossHealth,
+                _cellWidth * _profile.BossWidthCells * 0.9f,
+                _cellHeight * _profile.BossHeightCells * 0.9f,
+                _profile.BossTint);
+
+            MonsterInstance instance = new MonsterInstance
+            {
+                View = view,
+                Lane = lane,
+                Row = row,
+                WidthCells = _profile.BossWidthCells,
+                HeightCells = _profile.BossHeightCells,
+                IsBoss = true,
+                IsRanged = false,
+                RangedDamage = 0,
+                CoinReward = Mathf.Max(6, GetCoinRewardForCurrentRound() * 4),
+                StepCharge = 0f,
+                IsDefeated = false,
+                DotDamagePerTurn = 0,
+                DotTurnsRemaining = 0,
+                CharmTurnsRemaining = 0,
+                SlowMultiplier = 1f,
+                SlowTurnsRemaining = 0
+            };
+
+            _monsters.Add(instance);
+            view.SetWorldPosition(GetMonsterWorldPosition(instance));
+            view.SetSortingOrder(72);
+            _spawnSequence++;
+        }
+
+        private void FireRangedMonsterAttacks()
+        {
+            for (int i = 0; i < _monsters.Count; i++)
+            {
+                MonsterInstance monster = _monsters[i];
+
+                if (monster == null || monster.IsDefeated || monster.View == null || !monster.IsRanged || monster.RangedDamage <= 0)
+                {
+                    continue;
+                }
+
+                SpawnEnemyProjectile(monster);
+            }
+        }
+
+        private void ProcessBossTurn()
+        {
+            MonsterInstance boss = GetLivingBoss();
+
+            if (boss == null)
+            {
+                return;
+            }
+
+            TryTeleportBoss(boss);
+            TrySummonBossMinions(boss);
         }
 
         private IEnumerator AnimateMonsterSpawn(MonsterInstance monster, Vector3 startPosition, Vector3 targetPosition)
@@ -999,9 +1285,9 @@ namespace PuzzleBattle
                 Vector3 coinDropPosition = monster.View.transform.position;
                 int coinReward = Mathf.Max(1, monster.CoinReward);
                 monster.IsDefeated = true;
-                monster.View.PlayDeath();
+                monster.View.PlayDeath(ReturnMonsterViewToPool);
                 _monsters.Remove(monster);
-                MonsterDefeated?.Invoke(coinDropPosition, coinReward);
+                MonsterDefeated?.Invoke(coinDropPosition, coinReward, monster.IsRanged);
                 TryCompleteWaveImmediately();
             }
 
@@ -1108,10 +1394,11 @@ namespace PuzzleBattle
                     continue;
                 }
 
-                RemoveProjectileInstance(i, projectile);
-                ApplyDamageToMonster(target, projectile.Damage, projectile.Tint);
+                Vector3 impactPosition = target.View.transform.position;
+                SpawnProjectileImpactEffect(projectile, impactPosition);
+                bool defeated = ApplyDamageToMonster(target, projectile.Damage, projectile.Tint);
 
-                if (!target.IsDefeated)
+                if (!defeated)
                 {
                     if (projectile.DotTurns > 0)
                     {
@@ -1123,6 +1410,41 @@ namespace PuzzleBattle
                         ApplySlowToMonster(target, projectile.SlowMultiplier, projectile.SlowTurns);
                     }
                 }
+
+                if (TryContinueChainProjectile(projectile, target, impactPosition))
+                {
+                    continue;
+                }
+
+                RemoveProjectileInstance(i, projectile);
+            }
+        }
+
+        private void UpdateEnemyProjectiles()
+        {
+            for (int i = _enemyProjectiles.Count - 1; i >= 0; i--)
+            {
+                EnemyProjectileInstance projectile = _enemyProjectiles[i];
+
+                if (projectile == null || projectile.VisualRoot == null)
+                {
+                    RemoveEnemyProjectile(i, projectile);
+                    continue;
+                }
+
+                projectile.TravelProgress += Time.deltaTime / Mathf.Max(0.05f, projectile.TravelDuration);
+                float progress = Mathf.Clamp01(projectile.TravelProgress);
+                float easedProgress = 1f - Mathf.Pow(1f - progress, 2.2f);
+                projectile.Position = EvaluateQuadraticBezier(projectile.CurveStart, projectile.CurveControl, projectile.TargetPosition, easedProgress);
+                projectile.VisualRoot.position = projectile.Position;
+
+                if (progress < 1f && Vector3.Distance(projectile.Position, projectile.TargetPosition) > 0.08f)
+                {
+                    continue;
+                }
+
+                PlayerDamaged?.Invoke(projectile.Damage, projectile.TargetPosition);
+                RemoveEnemyProjectile(i, projectile);
             }
         }
 
@@ -1179,6 +1501,89 @@ namespace PuzzleBattle
             DisposeProjectile(projectile);
         }
 
+        private void RemoveEnemyProjectile(int index, EnemyProjectileInstance projectile)
+        {
+            if (index >= 0 && index < _enemyProjectiles.Count && ReferenceEquals(_enemyProjectiles[index], projectile))
+            {
+                _enemyProjectiles.RemoveAt(index);
+            }
+            else
+            {
+                _enemyProjectiles.Remove(projectile);
+            }
+
+            if (projectile != null && projectile.VisualRoot != null)
+            {
+                Destroy(projectile.VisualRoot.gameObject);
+            }
+        }
+
+        private void SpawnProjectileImpactEffect(ProjectileInstance projectile, Vector3 impactPosition)
+        {
+            if (projectile == null)
+            {
+                return;
+            }
+
+            float width = Mathf.Max(CellSize * 0.14f, CellSize * projectile.ImpactFallbackScale * 0.18f);
+            float height = Mathf.Max(CellSize * 0.4f, CellSize * projectile.ImpactFallbackScale);
+            SpawnOneShotEffect(
+                "LightningImpact",
+                impactPosition,
+                projectile.ImpactEffectPrefab,
+                94,
+                ProceduralSpriteLibrary.GetSquareSprite(),
+                projectile.Tint,
+                new Vector3(width, height, 1f),
+                projectile.ImpactEffectLifetime);
+        }
+
+        private bool TryContinueChainProjectile(ProjectileInstance projectile, MonsterInstance hitTarget, Vector3 impactPosition)
+        {
+            if (projectile == null || projectile.ChainRemaining <= 0)
+            {
+                return false;
+            }
+
+            if (projectile.HitHistory == null)
+            {
+                projectile.HitHistory = new List<MonsterInstance>();
+            }
+
+            if (hitTarget != null && !projectile.HitHistory.Contains(hitTarget))
+            {
+                projectile.HitHistory.Add(hitTarget);
+            }
+
+            MonsterInstance nextTarget = GetClosestChainTarget(hitTarget, projectile.ChainSearchRadiusCells, projectile.HitHistory);
+
+            if (nextTarget == null)
+            {
+                return false;
+            }
+
+            projectile.ChainRemaining--;
+            projectile.Target = nextTarget;
+            projectile.Position = impactPosition;
+            projectile.VisualRoot.position = impactPosition;
+            projectile.Damage = GetReducedChainDamage(projectile.Damage, projectile.ChainDamageFalloff);
+            projectile.CurveSide *= -1f;
+            projectile.CurveLift = Random.Range(CellSize * 0.08f, CellSize * 0.24f);
+            RebuildProjectileCurve(projectile, impactPosition, nextTarget.View.transform.position + (Vector3.up * 0.05f));
+            return true;
+        }
+
+        private static int GetReducedChainDamage(int currentDamage, float falloff)
+        {
+            if (currentDamage <= 1)
+            {
+                return 1;
+            }
+
+            int reducedDamage = Mathf.RoundToInt(currentDamage * Mathf.Clamp(falloff, 0.2f, 0.95f));
+            return Mathf.Clamp(reducedDamage, 1, currentDamage - 1);
+        }
+
         private MonsterInstance GetFrontMostMonster()
         {
             MonsterInstance best = null;
@@ -1201,6 +1606,19 @@ namespace PuzzleBattle
             return best;
         }
 
+        private MonsterInstance GetLivingBoss()
+        {
+            for (int i = 0; i < _monsters.Count; i++)
+            {
+                if (!_monsters[i].IsDefeated && _monsters[i].IsBoss)
+                {
+                    return _monsters[i];
+                }
+            }
+
+            return null;
+        }
+
         private MonsterInstance GetRandomFrontMonster(int count)
         {
             List<MonsterInstance> sorted = GetActiveMonsters();
@@ -1220,6 +1638,44 @@ namespace PuzzleBattle
             return active.Count == 0 ? null : active[Random.Range(0, active.Count)];
         }
 
+        private MonsterInstance GetClosestChainTarget(MonsterInstance source, float radiusCells, List<MonsterInstance> excluded)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            MonsterInstance best = null;
+            float bestDistance = float.MaxValue;
+
+            for (int i = 0; i < _monsters.Count; i++)
+            {
+                MonsterInstance candidate = _monsters[i];
+
+                if (candidate == null ||
+                    candidate.IsDefeated ||
+                    candidate == source ||
+                    (excluded != null && excluded.Contains(candidate)))
+                {
+                    continue;
+                }
+
+                float laneDistance = candidate.Lane - source.Lane;
+                float rowDistance = candidate.Row - source.Row;
+                float distance = Mathf.Sqrt((laneDistance * laneDistance) + (rowDistance * rowDistance));
+
+                if (distance > radiusCells || distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                best = candidate;
+                bestDistance = distance;
+            }
+
+            return best;
+        }
+
         private List<MonsterInstance> GetActiveMonsters()
         {
             List<MonsterInstance> active = new List<MonsterInstance>();
@@ -1233,6 +1689,53 @@ namespace PuzzleBattle
             }
 
             return active;
+        }
+
+        private void TryTeleportBoss(MonsterInstance boss)
+        {
+            if (boss == null)
+            {
+                return;
+            }
+
+            int maxLane = Mathf.Max(0, Columns - boss.WidthCells);
+            int maxRow = Mathf.Max(0, Rows - boss.HeightCells);
+
+            for (int attempt = 0; attempt < 12; attempt++)
+            {
+                int lane = Random.Range(0, maxLane + 1);
+                int row = Random.Range(Mathf.Max(0, Rows / 2), maxRow + 1);
+
+                if (!CanPlaceMonsterAt(lane, row, boss.WidthCells, boss.HeightCells, boss))
+                {
+                    continue;
+                }
+
+                boss.Lane = lane;
+                boss.Row = row;
+                RepositionMonsters();
+                return;
+            }
+        }
+
+        private void TrySummonBossMinions(MonsterInstance boss)
+        {
+            if (boss == null || Random.value > _profile.BossSummonChancePerTurn)
+            {
+                return;
+            }
+
+            int summonCount = Random.Range(_profile.BossMinSummonCount, _profile.BossMaxSummonCount + 1);
+
+            for (int i = 0; i < summonCount; i++)
+            {
+                if (!TryFindFreeCell(1, 1, boss, out int lane, out int row))
+                {
+                    break;
+                }
+
+                SpawnSummonedMinion(lane, row);
+            }
         }
 
         private List<MonsterInstance> GetRandomActiveMonsters(int count)
@@ -1415,6 +1918,27 @@ namespace PuzzleBattle
             }
 
             return false;
+        }
+
+        private int WorldToRow(Vector3 worldPosition)
+        {
+            if (_cellHeight <= 0.0001f)
+            {
+                return 0;
+            }
+
+            float normalized = (worldPosition.y - _origin.y) / _cellHeight;
+            return Mathf.RoundToInt(normalized);
+        }
+
+        private float WorldToLane(Vector3 worldPosition)
+        {
+            if (_cellWidth <= 0.0001f)
+            {
+                return 0f;
+            }
+
+            return (worldPosition.x - _origin.x) / _cellWidth;
         }
 
         private void SpawnOneShotEffect(string objectName, Vector3 position, GameObject effectPrefab, int sortingOrder, Sprite fallbackSprite, Color tint, Vector3 targetScale, float lifetime)
@@ -1617,7 +2141,7 @@ namespace PuzzleBattle
 
                 if (!monster.IsDefeated && monster.View != null)
                 {
-                    monster.View.SetWorldPosition(CellToWorld(monster.Lane, monster.Row));
+                    monster.View.SetWorldPosition(GetMonsterWorldPosition(monster));
                     monster.View.SetSortingOrder(70 + ((Rows - monster.Row) * 4));
                 }
             }
@@ -1628,17 +2152,21 @@ namespace PuzzleBattle
             return new Vector3(_origin.x + (lane * _cellWidth), _origin.y + (row * _cellHeight), 0f);
         }
 
-        private bool IsCellOccupied(int lane, int row)
+        private Vector3 GetMonsterWorldPosition(MonsterInstance monster)
         {
-            for (int i = 0; i < _monsters.Count; i++)
+            if (monster == null)
             {
-                if (!_monsters[i].IsDefeated && _monsters[i].Lane == lane && _monsters[i].Row == row)
-                {
-                    return true;
-                }
+                return Vector3.zero;
             }
 
-            return false;
+            float centerLane = monster.Lane + ((Mathf.Max(1, monster.WidthCells) - 1) * 0.5f);
+            float centerRow = monster.Row + ((Mathf.Max(1, monster.HeightCells) - 1) * 0.5f);
+            return CellToWorld(centerLane, centerRow);
+        }
+
+        private bool IsCellOccupied(int lane, int row)
+        {
+            return !CanPlaceMonsterAt(lane, row, 1, 1, null);
         }
 
         private void UpdateHazardVisual(HazardInstance hazard)
@@ -1683,6 +2211,16 @@ namespace PuzzleBattle
                 Random.Range(0, _profile.CoinVariance + 1);
         }
 
+        private int GetEscapeDamageForCurrentRound()
+        {
+            return _profile.EscapeDamage + ((_currentRound - 1) * _profile.EscapeDamageIncreasePerRound);
+        }
+
+        private int GetRangedDamageForCurrentRound()
+        {
+            return _profile.RangedAttackDamage + ((_currentRound - 1) * _profile.RangedAttackDamageIncreasePerRound);
+        }
+
         private int GetSpawnTurnsForCurrentRound()
         {
             return _profile.SpawnTurnsPerRound + ((_currentRound - 1) * _profile.SpawnTurnsGrowthPerRound);
@@ -1708,6 +2246,11 @@ namespace PuzzleBattle
             }
 
             _projectiles.Clear();
+
+            for (int i = _enemyProjectiles.Count - 1; i >= 0; i--)
+            {
+                RemoveEnemyProjectile(i, _enemyProjectiles[i]);
+            }
         }
 
         private void ClearLiveMonsters()
@@ -1716,11 +2259,97 @@ namespace PuzzleBattle
             {
                 if (_monsters[i].View != null)
                 {
-                    Destroy(_monsters[i].View.gameObject);
+                    ReturnMonsterViewToPool(_monsters[i].View);
                 }
             }
 
             _monsters.Clear();
+        }
+
+        private bool CanPlaceMonsterAt(int lane, int row, int widthCells, int heightCells, MonsterInstance ignore)
+        {
+            if (lane < 0 || row < 0 || lane + Mathf.Max(1, widthCells) > Columns || row + Mathf.Max(1, heightCells) > Rows)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < _monsters.Count; i++)
+            {
+                MonsterInstance monster = _monsters[i];
+
+                if (monster == null || monster.IsDefeated || monster == ignore)
+                {
+                    continue;
+                }
+
+                if (RectanglesOverlap(lane, row, widthCells, heightCells, monster.Lane, monster.Row, Mathf.Max(1, monster.WidthCells), Mathf.Max(1, monster.HeightCells)))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool RectanglesOverlap(int laneA, int rowA, int widthA, int heightA, int laneB, int rowB, int widthB, int heightB)
+        {
+            return laneA < laneB + widthB &&
+                laneA + widthA > laneB &&
+                rowA < rowB + heightB &&
+                rowA + heightA > rowB;
+        }
+
+        private bool TryFindFreeCell(int widthCells, int heightCells, MonsterInstance ignore, out int lane, out int row)
+        {
+            int maxLane = Mathf.Max(0, Columns - widthCells);
+            int maxRow = Mathf.Max(0, Rows - heightCells);
+
+            for (int attempt = 0; attempt < 24; attempt++)
+            {
+                lane = Random.Range(0, maxLane + 1);
+                row = Random.Range(Mathf.Max(0, Rows / 2), maxRow + 1);
+
+                if (CanPlaceMonsterAt(lane, row, widthCells, heightCells, ignore))
+                {
+                    return true;
+                }
+            }
+
+            lane = 0;
+            row = 0;
+            return false;
+        }
+
+        private void SpawnSummonedMinion(int lane, int row)
+        {
+            int health = Mathf.Max(1, _profile.BaseHealth + ((_currentRound - 1) * _profile.RoundHealthIncrease / 2));
+            MonsterView view = GetMonsterViewFromPool($"Summon_{_spawnSequence:000}");
+            view.Initialize($"S{_currentRound} #{_spawnSequence + 1}", health, _cellWidth * 0.7f, _cellHeight * 0.66f, _profile.MonsterTint);
+
+            MonsterInstance instance = new MonsterInstance
+            {
+                View = view,
+                Lane = lane,
+                Row = row,
+                WidthCells = 1,
+                HeightCells = 1,
+                IsBoss = false,
+                IsRanged = false,
+                RangedDamage = 0,
+                CoinReward = Mathf.Max(1, GetCoinRewardForCurrentRound()),
+                StepCharge = 0f,
+                IsDefeated = false,
+                DotDamagePerTurn = 0,
+                DotTurnsRemaining = 0,
+                CharmTurnsRemaining = 0,
+                SlowMultiplier = 1f,
+                SlowTurnsRemaining = 0
+            };
+
+            _monsters.Add(instance);
+            view.SetWorldPosition(GetMonsterWorldPosition(instance));
+            view.SetSortingOrder(70 + ((Rows - instance.Row) * 4));
+            _spawnSequence++;
         }
 
         private static void DisposeHazard(HazardInstance hazard)
@@ -1737,6 +2366,112 @@ namespace PuzzleBattle
             {
                 Object.Destroy(projectile.VisualRoot.gameObject);
             }
+        }
+
+        private void HandleMonsterEscape(MonsterInstance monster)
+        {
+            if (monster == null || monster.IsDefeated)
+            {
+                return;
+            }
+
+            monster.IsDefeated = true;
+            _monsters.Remove(monster);
+            Vector3 damageOrigin = CellToWorld(monster.Lane, 0f);
+
+            if (monster.View != null)
+            {
+                ReturnMonsterViewToPool(monster.View);
+            }
+
+            PlayerDamaged?.Invoke(GetEscapeDamageForCurrentRound(), damageOrigin);
+            TryCompleteWaveImmediately();
+        }
+
+        private MonsterView GetMonsterViewFromPool(string objectName)
+        {
+            if (_monsterViewPool == null)
+            {
+                _monsterViewPool = new SimplePool<MonsterView>(
+                    () =>
+                    {
+                        GameObject monsterObject = new GameObject("MonsterView");
+                        monsterObject.transform.SetParent(transform, false);
+                        return monsterObject.AddComponent<MonsterView>();
+                    },
+                    view =>
+                    {
+                        view.gameObject.SetActive(true);
+                        view.transform.SetParent(transform, false);
+                    },
+                    view => view.DeactivateImmediate());
+            }
+
+            MonsterView monsterView = _monsterViewPool.Get();
+            monsterView.name = objectName;
+            return monsterView;
+        }
+
+        private void ReturnMonsterViewToPool(MonsterView view)
+        {
+            if (view == null)
+            {
+                return;
+            }
+
+            if (_monsterViewPool == null)
+            {
+                view.DeactivateImmediate();
+                return;
+            }
+
+            _monsterViewPool.Release(view);
+        }
+
+        private void SpawnEnemyProjectile(MonsterInstance monster)
+        {
+            if (monster == null || monster.View == null)
+            {
+                return;
+            }
+
+            Transform visualRoot = CreateEffectVisual(
+                "EnemyProjectile",
+                transform,
+                null,
+                93,
+                ProceduralSpriteLibrary.GetOrbSprite(),
+                _profile.RangedMonsterTint,
+                out SpriteRenderer unusedRenderer,
+                out Vector3 visualBaseScale);
+
+            Vector3 origin = monster.View.transform.position + new Vector3(0f, monster.View.Height * 0.05f, 0f);
+            Vector3 target = GetPlayerImpactPosition();
+            float distance = Mathf.Max(0.001f, Vector3.Distance(origin, target));
+            float duration = Mathf.Max(0.14f, distance / Mathf.Max(0.5f, _profile.RangedProjectileSpeed));
+            Vector3 direction = (target - origin).normalized;
+            Vector3 perpendicular = new Vector3(-direction.y, direction.x, 0f);
+            Vector3 control = ((origin + target) * 0.5f) + (perpendicular * Random.Range(-CellSize * 0.2f, CellSize * 0.2f)) + (Vector3.up * Mathf.Max(CellSize * 0.18f, distance * 0.14f));
+
+            visualRoot.position = origin;
+            ApplyVisualScale(visualRoot, visualBaseScale, Vector3.one * CellSize * 0.34f);
+
+            _enemyProjectiles.Add(new EnemyProjectileInstance
+            {
+                VisualRoot = visualRoot,
+                Position = origin,
+                CurveStart = origin,
+                CurveControl = control,
+                TargetPosition = target,
+                TravelProgress = 0f,
+                TravelDuration = duration,
+                Damage = monster.RangedDamage
+            });
+        }
+
+        private Vector3 GetPlayerImpactPosition()
+        {
+            return new Vector3(_region.center.x, _region.yMin - Mathf.Max(_cellHeight * 0.32f, 0.18f), 0f);
         }
     }
 }
