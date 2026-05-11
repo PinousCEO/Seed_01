@@ -661,10 +661,28 @@ namespace PuzzleBattle.Editor
             Text statusLabel = CreateUiText(topUiRoot, "StatusLabel", font, 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
             Text skillsLabel = CreateUiText(topUiRoot, "SkillsLabel", font, 20, FontStyle.Bold, TextAnchor.LowerLeft, new Color(1f, 0.95f, 0.8f, 0.95f));
             Text comboLabel = CreateUiText(uiRoot, "ComboLabel", font, 28, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.82f));
+            RectTransform turnTimerBarRoot = CreateUiRect(topUiRoot, "TurnTimerBar");
+            Image turnTimerBarBackground = CreateUiImage(turnTimerBarRoot, "Background", new Color(0.14f, 0.18f, 0.24f, 0.92f));
+            StretchRect(turnTimerBarBackground.rectTransform);
+            Image turnTimerBarFill = CreateUiImage(turnTimerBarRoot, "Fill", new Color(0.38f, 0.82f, 1f, 0.96f));
+            RectTransform coinHudRoot = CreateUiRect(topUiRoot, "CoinHud");
+            Image coinHudIcon = CreateUiImage(coinHudRoot, "CoinIcon", new Color(1f, 0.84f, 0.22f, 0.96f));
+            Text coinHudLabel = CreateUiText(coinHudRoot, "CoinLabel", font, 24, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.94f, 0.72f, 1f));
+            RectTransform playerHealthRoot = CreateUiRect(topUiRoot, "PlayerHealthBar");
+            Image playerHealthBarBackground = CreateUiImage(playerHealthRoot, "Background", new Color(0.18f, 0.09f, 0.1f, 0.94f));
+            StretchRect(playerHealthBarBackground.rectTransform);
+            Image playerHealthBarFill = CreateUiImage(playerHealthRoot, "Fill", new Color(0.92f, 0.28f, 0.24f, 0.96f));
+            Text playerHealthLabel = CreateUiText(playerHealthRoot, "Label", font, 18, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.92f, 1f));
             SetRectTransform(roundLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -18f), new Vector2(640f, 42f));
             SetRectTransform(timerLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -56f), new Vector2(840f, 30f));
+            SetRectTransform(turnTimerBarRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -82f), new Vector2(360f, 18f));
             SetRectTransform(statusLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -92f), new Vector2(980f, 30f));
+            SetRectTransform(coinHudRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(482f, -18f), new Vector2(220f, 42f));
+            SetRectTransform(coinHudIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(30f, 30f));
+            SetRectTransform(coinHudLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(170f, 36f));
             SetRectTransform(skillsLabel.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(26f, 12f), new Vector2(240f, 24f));
+            SetRectTransform(playerHealthRoot, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(-52f, 24f));
+            SetRectTransform(playerHealthLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             SetRectTransform(comboLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(760f, 36f));
 
             PuzzleBattleUiDocument.SkillCardSlot[] cardSlots = new PuzzleBattleUiDocument.SkillCardSlot[3];
@@ -732,8 +750,30 @@ namespace PuzzleBattle.Editor
                 CreateHudButtonSlot(topUiRoot, font, "quit", "종료")
             };
 
+            PuzzleBattleUiDocument.TurnTimerBarSlot turnTimerBar = new PuzzleBattleUiDocument.TurnTimerBarSlot
+            {
+                Root = turnTimerBarRoot,
+                Background = turnTimerBarBackground,
+                Fill = turnTimerBarFill
+            };
+
+            PuzzleBattleUiDocument.CoinHudSlot coinHud = new PuzzleBattleUiDocument.CoinHudSlot
+            {
+                Root = coinHudRoot,
+                Icon = coinHudIcon,
+                Label = coinHudLabel
+            };
+
+            PuzzleBattleUiDocument.PlayerHealthBarSlot playerHealthBar = new PuzzleBattleUiDocument.PlayerHealthBarSlot
+            {
+                Root = playerHealthRoot,
+                Background = playerHealthBarBackground,
+                Fill = playerHealthBarFill,
+                Label = playerHealthLabel
+            };
+
             PuzzleBattleUiDocument document = root.GetComponent<PuzzleBattleUiDocument>();
-            document.SetAuthoringReferences(canvas, uiRoot, topUiRoot, cardAreaRoot, roundLabel, statusLabel, timerLabel, skillsLabel, comboLabel, cardSlots, iconSlots, hudButtons);
+            document.SetAuthoringReferences(canvas, uiRoot, topUiRoot, cardAreaRoot, true, roundLabel, statusLabel, timerLabel, skillsLabel, comboLabel, turnTimerBar, coinHud, playerHealthBar, cardSlots, iconSlots, hudButtons);
 
             PrefabUtility.SaveAsPrefabAsset(root, UiPrefabPath);
             Object.DestroyImmediate(root);

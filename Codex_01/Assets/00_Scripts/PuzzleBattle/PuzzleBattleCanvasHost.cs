@@ -4,12 +4,14 @@ namespace PuzzleBattle
     public sealed class PuzzleBattleCanvasHost : MonoBehaviour
     {
         [SerializeField] private Canvas canvas;
+        [SerializeField] private PuzzleBattleUiDocument uiDocument;
         [SerializeField] private RectTransform uiRoot;
         [SerializeField] private RectTransform topUiRoot;
         [SerializeField] private RectTransform cardAreaRoot;
         [SerializeField] private bool createMissingRoots = true;
 
         public Canvas Canvas => canvas;
+        public PuzzleBattleUiDocument UiDocument => uiDocument;
         public RectTransform UiRoot => uiRoot;
         public RectTransform TopUiRoot => topUiRoot;
         public RectTransform CardAreaRoot => cardAreaRoot;
@@ -20,6 +22,11 @@ namespace PuzzleBattle
             if (canvas == null)
             {
                 canvas = GetComponent<Canvas>();
+            }
+
+            if (uiDocument == null)
+            {
+                uiDocument = GetComponent<PuzzleBattleUiDocument>();
             }
 
             if (canvas != null && uiRoot == null)

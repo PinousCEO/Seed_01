@@ -74,6 +74,7 @@ namespace PuzzleBattle
         private SpriteRenderer _bottomBackground;
         private SpriteRenderer _divider;
         private PuzzleBattleCanvasHost _canvasHost;
+        private PuzzleBattleUiDocument _uiDocument;
         private Canvas _uiCanvas;
         private RectTransform _uiRoot;
         private RectTransform _topUiRoot;
@@ -149,7 +150,12 @@ namespace PuzzleBattle
             _playerCurrentHealth = _playerMaxHealth;
             _turnTimeRemaining = PlayerTurnDurationSeconds;
 
-            CreateSceneVisuals();
+            if (!CreateSceneVisuals())
+            {
+                enabled = false;
+                return;
+            }
+
             CreateControllers();
             LayoutScene();
 
@@ -696,7 +702,7 @@ namespace PuzzleBattle
             _comboRoutine = null;
         }
 
-        private void CreateSceneVisuals()
+        private bool CreateSceneVisuals()
         {
             ResolveBattlefieldSceneRenderers();
             _topBackground = CreatePanel("TopBackground", new Color(0.09f, 0.13f, 0.18f, 1f), -20);
@@ -714,42 +720,14 @@ namespace PuzzleBattle
             _bottomBackground = CreatePanel("BottomBackground", new Color(0.13f, 0.11f, 0.18f, 1f), -20);
             _divider = CreatePanel("Divider", new Color(0.98f, 0.92f, 0.6f, 0.9f), -10);
 
-            EnsureUiCanvas();
-
-            _roundLabel = CreateUiLabel(_topUiRoot, "RoundLabel", 34, FontStyle.Bold, TextAnchor.UpperLeft, new Color(1f, 0.97f, 0.88f, 1f));
-            _timerLabel = CreateUiLabel(_topUiRoot, "TimerLabel", 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.85f, 0.92f, 1f, 0.92f));
-            _turnTimerBarRoot = CreateUiRect(_topUiRoot, "TurnTimerBar");
-            _turnTimerBarBackground = CreateUiImage(_turnTimerBarRoot, "Background", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.14f, 0.18f, 0.24f, 0.92f));
-            StretchRect(_turnTimerBarBackground.rectTransform);
-            _turnTimerBarFill = CreateUiImage(_turnTimerBarRoot, "Fill", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.38f, 0.82f, 1f, 0.96f));
-            _statusLabel = CreateUiLabel(_topUiRoot, "StatusLabel", 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
-            _coinHudRoot = CreateUiRect(_topUiRoot, "CoinHud");
-            _coinHudIcon = CreateUiImage(_coinHudRoot, "CoinIcon", ProceduralSpriteLibrary.GetSoftCircleSprite(), new Color(1f, 0.84f, 0.22f, 0.96f));
-            _coinLabel = CreateUiLabel(_coinHudRoot, "CoinLabel", 24, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.94f, 0.72f, 1f));
-            _skillsLabel = CreateUiLabel(_topUiRoot, "SkillsLabel", 20, FontStyle.Bold, TextAnchor.LowerLeft, new Color(1f, 0.95f, 0.8f, 0.95f));
-            _playerHealthRoot = CreateUiRect(_topUiRoot, "PlayerHealthBar");
-            _playerHealthBarBackground = CreateUiImage(_playerHealthRoot, "Background", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.18f, 0.09f, 0.1f, 0.94f));
-            StretchRect(_playerHealthBarBackground.rectTransform);
-            _playerHealthBarFill = CreateUiImage(_playerHealthRoot, "Fill", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.92f, 0.28f, 0.24f, 0.96f));
-            _playerHealthLabel = CreateUiLabel(_playerHealthRoot, "Label", 18, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.92f, 1f));
-            _comboLabel = CreateUiLabel(_uiRoot, "ComboLabel", 28, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.82f));
-
-            for (int i = 0; i < 3; i++)
+            if (!EnsureUiCanvas())
             {
-                _skillCards.Add(CreateSkillChoiceCard(i));
+                Debug.LogError("PuzzleBattle UI is not configured. Add a Canvas with PuzzleBattleUiDocument and connect it through PuzzleBattleCanvasHost or place the document in the scene.", this);
+                return false;
             }
-
-            int iconCount = Mathf.Max(6, _skillDefinitions.Count);
-
-            for (int i = 0; i < iconCount; i++)
-            {
-                _skillIcons.Add(CreateAcquiredSkillIcon(i));
-            }
-
-            _hudButtons.Add(CreateHudButton("settings", "\uC124\uC815"));
-            _hudButtons.Add(CreateHudButton("quit", "\uC885\uB8CC"));
 
             SetSkillCardsVisible(false);
+            return true;
         }
 
         private void CreateControllers()
@@ -1694,6 +1672,7 @@ namespace PuzzleBattle
         {
             SetSkillCardsVisible(_skillSelectionActive);
             Canvas.ForceUpdateCanvases();
+            bool applyRuntimeLayout = _uiDocument == null || _uiDocument.ApplyRuntimeLayout;
 
             int visibleCount = _skillSelectionActive
                 ? Mathf.Min(_presentedChoices.Count, _skillCards.Count)
@@ -1724,6 +1703,11 @@ namespace PuzzleBattle
                 card.Description.text = skill.Description;
                 card.ActionLabel.text = currentLevel > 0 ? $"Lv.{currentLevel} -> Lv.{nextLevel}" : "획득";
 
+                if (!applyRuntimeLayout)
+                {
+                    continue;
+                }
+
                 float spacing = visibleCount > 1 ? i / (float)(visibleCount - 1) : 0.5f;
                 float cardWidth = Mathf.Min(420f, (areaWidth - (layoutPadding * 2f) - (cardSpacing * Mathf.Max(0, visibleCount - 1))) / Mathf.Max(1, visibleCount));
                 float cardHeight = Mathf.Min(340f, areaHeight - 18f);
@@ -1742,6 +1726,11 @@ namespace PuzzleBattle
 
         private void LayoutHudButtons(Rect topRect)
         {
+            if (_uiDocument != null && !_uiDocument.ApplyRuntimeLayout)
+            {
+                return;
+            }
+
             float buttonWidth = 128f;
             float buttonHeight = 38f;
             float spacing = 12f;
@@ -1759,6 +1748,11 @@ namespace PuzzleBattle
 
         private void LayoutAcquiredSkillIcons(Rect topRect)
         {
+            if (_uiDocument != null && !_uiDocument.ApplyRuntimeLayout)
+            {
+                return;
+            }
+
             int totalIcons = Mathf.Max(1, _skillIcons.Count);
             float availableWidth = Mathf.Max(280f, _topUiRoot.rect.width - 160f);
             float spacing = totalIcons > 1 ? Mathf.Clamp(availableWidth / (totalIcons * 10f), 8f, 14f) : 0f;
@@ -1826,14 +1820,22 @@ namespace PuzzleBattle
 
                 if (button.Id == "settings")
                 {
-                    button.Background.color = _settingsOpen
-                        ? new Color(0.32f, 0.45f, 0.62f, 0.96f)
-                        : new Color(0.15f, 0.18f, 0.24f, 0.96f);
+                    if (button.Background != null)
+                    {
+                        button.Background.color = _settingsOpen
+                            ? new Color(0.32f, 0.45f, 0.62f, 0.96f)
+                            : new Color(0.15f, 0.18f, 0.24f, 0.96f);
+                    }
+
                     button.Label.text = _settingsOpen ? "계속" : "설정";
                 }
                 else
                 {
-                    button.Background.color = new Color(0.34f, 0.18f, 0.18f, 0.96f);
+                    if (button.Background != null)
+                    {
+                        button.Background.color = new Color(0.34f, 0.18f, 0.18f, 0.96f);
+                    }
+
                     button.Label.text = "종료";
                 }
             }
@@ -2281,11 +2283,11 @@ namespace PuzzleBattle
             return safeHeight * scale;
         }
 
-        private void EnsureUiCanvas()
+        private bool EnsureUiCanvas()
         {
             if (_uiCanvas != null)
             {
-                return;
+                return true;
             }
 
             EnsureEventSystem();
@@ -2293,67 +2295,194 @@ namespace PuzzleBattle
 
             if (TryUseExternalCanvasHost())
             {
-                return;
+                return true;
             }
 
-            GameObject canvasObject = new GameObject("PuzzleBattleCanvas");
-            canvasObject.transform.SetParent(transform, false);
-            _uiCanvas = canvasObject.AddComponent<Canvas>();
-            _uiCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _uiCanvas.sortingOrder = 200;
-
-            CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
-
-            canvasObject.AddComponent<GraphicRaycaster>();
-            _uiRoot = canvasObject.GetComponent<RectTransform>();
-            StretchRect(_uiRoot);
-
-            _topUiRoot = CreateUiRect(_uiRoot, "TopUIRoot");
-            SetAnchorStretch(_topUiRoot, new Vector2(0f, 0.5f), Vector2.one);
-
-            _cardAreaRoot = CreateUiRect(_uiRoot, "SkillCardArea");
+            PuzzleBattleUiDocument document = FindFirstObjectByType<PuzzleBattleUiDocument>();
+            return TryBindUiDocument(document);
         }
 
         private bool TryUseExternalCanvasHost()
         {
-            if (_canvasHost == null || _canvasHost.Canvas == null)
+            if (_canvasHost == null)
             {
                 return false;
             }
 
-            _uiCanvas = _canvasHost.Canvas;
-            _uiRoot = _canvasHost.UiRoot != null
-                ? _canvasHost.UiRoot
-                : _uiCanvas.GetComponent<RectTransform>();
+            PuzzleBattleUiDocument document = _canvasHost.UiDocument != null
+                ? _canvasHost.UiDocument
+                : _canvasHost.GetComponent<PuzzleBattleUiDocument>();
 
-            if (_uiRoot == null)
+            if (document == null && _canvasHost.Canvas != null)
+            {
+                document = _canvasHost.Canvas.GetComponent<PuzzleBattleUiDocument>();
+            }
+
+            return TryBindUiDocument(document);
+        }
+
+        private bool TryBindUiDocument(PuzzleBattleUiDocument document)
+        {
+            if (document == null)
             {
                 return false;
             }
 
-            _topUiRoot = _canvasHost.TopUiRoot;
-            _cardAreaRoot = _canvasHost.CardAreaRoot;
+            Canvas canvas = document.Canvas;
+            RectTransform uiRoot = document.UiRoot;
+            RectTransform topUiRoot = document.TopUiRoot;
+            RectTransform cardAreaRoot = document.CardAreaRoot;
+            PuzzleBattleUiDocument.TurnTimerBarSlot turnTimerBar = document.TurnTimerBar;
+            PuzzleBattleUiDocument.CoinHudSlot coinHud = document.CoinHud;
+            PuzzleBattleUiDocument.PlayerHealthBarSlot playerHealthBar = document.PlayerHealthBar;
 
-            if (_topUiRoot == null && _canvasHost.CreateMissingRoots)
-            {
-                _topUiRoot = CreateUiRect(_uiRoot, "TopUIRoot");
-            }
-
-            if (_cardAreaRoot == null && _canvasHost.CreateMissingRoots)
-            {
-                _cardAreaRoot = CreateUiRect(_uiRoot, "SkillCardArea");
-            }
-
-            if (_topUiRoot == null || _cardAreaRoot == null)
+            if (canvas == null ||
+                uiRoot == null ||
+                topUiRoot == null ||
+                cardAreaRoot == null ||
+                document.RoundLabel == null ||
+                document.StatusLabel == null ||
+                document.TimerLabel == null ||
+                document.SkillsLabel == null ||
+                document.ComboLabel == null ||
+                turnTimerBar == null ||
+                turnTimerBar.Root == null ||
+                turnTimerBar.Fill == null ||
+                coinHud == null ||
+                coinHud.Root == null ||
+                coinHud.Icon == null ||
+                coinHud.Label == null ||
+                playerHealthBar == null ||
+                playerHealthBar.Root == null ||
+                playerHealthBar.Fill == null ||
+                playerHealthBar.Label == null)
             {
                 return false;
             }
 
-            SetAnchorStretch(_topUiRoot, new Vector2(0f, 0.5f), Vector2.one);
+            _uiDocument = document;
+            _uiCanvas = canvas;
+            _uiRoot = uiRoot;
+            _topUiRoot = topUiRoot;
+            _cardAreaRoot = cardAreaRoot;
+            _roundLabel = document.RoundLabel;
+            _statusLabel = document.StatusLabel;
+            _timerLabel = document.TimerLabel;
+            _skillsLabel = document.SkillsLabel;
+            _comboLabel = document.ComboLabel;
+            _turnTimerBarRoot = turnTimerBar.Root;
+            _turnTimerBarBackground = turnTimerBar.Background;
+            _turnTimerBarFill = turnTimerBar.Fill;
+            _coinHudRoot = coinHud.Root;
+            _coinHudIcon = coinHud.Icon;
+            _coinLabel = coinHud.Label;
+            _playerHealthRoot = playerHealthBar.Root;
+            _playerHealthBarBackground = playerHealthBar.Background;
+            _playerHealthBarFill = playerHealthBar.Fill;
+            _playerHealthLabel = playerHealthBar.Label;
+
+            _skillCards.Clear();
+            PuzzleBattleUiDocument.SkillCardSlot[] cardSlots = document.SkillCards;
+
+            if (cardSlots != null)
+            {
+                for (int i = 0; i < cardSlots.Length; i++)
+                {
+                    PuzzleBattleUiDocument.SkillCardSlot slot = cardSlots[i];
+
+                    if (slot == null || slot.Root == null || slot.Accent == null || slot.Title == null || slot.Description == null || slot.ActionLabel == null || slot.Button == null)
+                    {
+                        continue;
+                    }
+
+                    if (slot.Background != null && slot.Button.targetGraphic == null)
+                    {
+                        slot.Button.targetGraphic = slot.Background;
+                    }
+
+                    int index = _skillCards.Count;
+                    slot.Button.onClick.RemoveAllListeners();
+                    slot.Button.onClick.AddListener(() => OnSkillCardPressed(index));
+
+                    _skillCards.Add(new SkillChoiceCard
+                    {
+                        Index = index,
+                        Root = slot.Root,
+                        Background = slot.Background,
+                        Accent = slot.Accent,
+                        Title = slot.Title,
+                        Description = slot.Description,
+                        ActionLabel = slot.ActionLabel,
+                        Button = slot.Button,
+                        Bounds = new Rect()
+                    });
+                }
+            }
+
+            _skillIcons.Clear();
+            PuzzleBattleUiDocument.SkillIconSlot[] iconSlots = document.SkillIcons;
+
+            if (iconSlots != null)
+            {
+                for (int i = 0; i < iconSlots.Length; i++)
+                {
+                    PuzzleBattleUiDocument.SkillIconSlot slot = iconSlots[i];
+
+                    if (slot == null || slot.Root == null || slot.Frame == null || slot.Icon == null || slot.LevelLabel == null)
+                    {
+                        continue;
+                    }
+
+                    _skillIcons.Add(new AcquiredSkillIcon
+                    {
+                        Root = slot.Root,
+                        Frame = slot.Frame,
+                        Icon = slot.Icon,
+                        LevelLabel = slot.LevelLabel
+                    });
+                }
+            }
+
+            _hudButtons.Clear();
+            PuzzleBattleUiDocument.HudButtonSlot[] hudButtonSlots = document.HudButtons;
+
+            if (hudButtonSlots != null)
+            {
+                for (int i = 0; i < hudButtonSlots.Length; i++)
+                {
+                    PuzzleBattleUiDocument.HudButtonSlot slot = hudButtonSlots[i];
+
+                    if (slot == null || string.IsNullOrWhiteSpace(slot.Id) || slot.Root == null || slot.Label == null || slot.Button == null)
+                    {
+                        continue;
+                    }
+
+                    if (slot.Background != null && slot.Button.targetGraphic == null)
+                    {
+                        slot.Button.targetGraphic = slot.Background;
+                    }
+
+                    string id = slot.Id;
+                    slot.Button.onClick.RemoveAllListeners();
+                    slot.Button.onClick.AddListener(() => OnHudButtonPressed(id));
+
+                    _hudButtons.Add(new HudButton
+                    {
+                        Id = id,
+                        Root = slot.Root,
+                        Background = slot.Background,
+                        Label = slot.Label,
+                        Button = slot.Button,
+                        Bounds = new Rect()
+                    });
+                }
+            }
+
+            if (_skillCards.Count == 0)
+            {
+                return false;
+            }
+
             return true;
         }
 
@@ -2374,6 +2503,12 @@ namespace PuzzleBattle
         {
             if (_uiRoot == null)
             {
+                return;
+            }
+
+            if (_uiDocument != null && !_uiDocument.ApplyRuntimeLayout)
+            {
+                Canvas.ForceUpdateCanvases();
                 return;
             }
 
