@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using TMPro;
 using UnityEngine.UI;
 
 namespace PuzzleBattle.Editor
@@ -656,23 +657,23 @@ namespace PuzzleBattle.Editor
             RectTransform cardAreaRoot = CreateUiRect(uiRoot, "SkillCardArea");
             StretchRect(cardAreaRoot);
 
-            Text roundLabel = CreateUiText(topUiRoot, "RoundLabel", font, 34, FontStyle.Bold, TextAnchor.UpperLeft, Color.white);
-            Text timerLabel = CreateUiText(topUiRoot, "TimerLabel", font, 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.85f, 0.92f, 1f, 0.92f));
-            Text statusLabel = CreateUiText(topUiRoot, "StatusLabel", font, 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
-            Text skillsLabel = CreateUiText(topUiRoot, "SkillsLabel", font, 20, FontStyle.Bold, TextAnchor.LowerLeft, new Color(1f, 0.95f, 0.8f, 0.95f));
-            Text comboLabel = CreateUiText(uiRoot, "ComboLabel", font, 28, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.82f));
+            TextMeshProUGUI roundLabel = CreateUiText(topUiRoot, "RoundLabel", font, 34, FontStyle.Bold, TextAnchor.UpperLeft, Color.white);
+            TextMeshProUGUI timerLabel = CreateUiText(topUiRoot, "TimerLabel", font, 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.85f, 0.92f, 1f, 0.92f));
+            TextMeshProUGUI statusLabel = CreateUiText(topUiRoot, "StatusLabel", font, 22, FontStyle.Normal, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
+            TextMeshProUGUI skillsLabel = CreateUiText(topUiRoot, "SkillsLabel", font, 20, FontStyle.Bold, TextAnchor.LowerLeft, new Color(1f, 0.95f, 0.8f, 0.95f));
+            TextMeshProUGUI comboLabel = CreateUiText(uiRoot, "ComboLabel", font, 28, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.82f));
             RectTransform turnTimerBarRoot = CreateUiRect(topUiRoot, "TurnTimerBar");
             Image turnTimerBarBackground = CreateUiImage(turnTimerBarRoot, "Background", new Color(0.14f, 0.18f, 0.24f, 0.92f));
             StretchRect(turnTimerBarBackground.rectTransform);
             Image turnTimerBarFill = CreateUiImage(turnTimerBarRoot, "Fill", new Color(0.38f, 0.82f, 1f, 0.96f));
             RectTransform coinHudRoot = CreateUiRect(topUiRoot, "CoinHud");
             Image coinHudIcon = CreateUiImage(coinHudRoot, "CoinIcon", new Color(1f, 0.84f, 0.22f, 0.96f));
-            Text coinHudLabel = CreateUiText(coinHudRoot, "CoinLabel", font, 24, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.94f, 0.72f, 1f));
+            TextMeshProUGUI coinHudLabel = CreateUiText(coinHudRoot, "CoinLabel", font, 24, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.94f, 0.72f, 1f));
             RectTransform playerHealthRoot = CreateUiRect(topUiRoot, "PlayerHealthBar");
             Image playerHealthBarBackground = CreateUiImage(playerHealthRoot, "Background", new Color(0.18f, 0.09f, 0.1f, 0.94f));
             StretchRect(playerHealthBarBackground.rectTransform);
             Image playerHealthBarFill = CreateUiImage(playerHealthRoot, "Fill", new Color(0.92f, 0.28f, 0.24f, 0.96f));
-            Text playerHealthLabel = CreateUiText(playerHealthRoot, "Label", font, 18, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.92f, 1f));
+            TextMeshProUGUI playerHealthLabel = CreateUiText(playerHealthRoot, "Label", font, 18, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.92f, 1f));
             SetRectTransform(roundLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -18f), new Vector2(640f, 42f));
             SetRectTransform(timerLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -56f), new Vector2(840f, 30f));
             SetRectTransform(turnTimerBarRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -82f), new Vector2(360f, 18f));
@@ -693,9 +694,9 @@ namespace PuzzleBattle.Editor
                 Image background = CreateUiImage(cardRoot, "Background", new Color(0.14f, 0.16f, 0.22f, 0.96f));
                 StretchRect(background.rectTransform);
                 Image accent = CreateUiImage(cardRoot, "Accent", Color.white);
-                Text title = CreateUiText(cardRoot, "Title", font, 26, FontStyle.Bold, TextAnchor.UpperCenter, Color.white);
-                Text description = CreateUiText(cardRoot, "Description", font, 18, FontStyle.Normal, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.82f));
-                Text action = CreateUiText(cardRoot, "Action", font, 18, FontStyle.Bold, TextAnchor.LowerCenter, new Color(1f, 0.95f, 0.72f, 1f));
+                TextMeshProUGUI title = CreateUiText(cardRoot, "Title", font, 26, FontStyle.Bold, TextAnchor.UpperCenter, Color.white);
+                TextMeshProUGUI description = CreateUiText(cardRoot, "Description", font, 18, FontStyle.Normal, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.82f));
+                TextMeshProUGUI action = CreateUiText(cardRoot, "Action", font, 18, FontStyle.Bold, TextAnchor.LowerCenter, new Color(1f, 0.95f, 0.72f, 1f));
                 Button button = cardRoot.gameObject.AddComponent<Button>();
                 button.targetGraphic = background;
                 SetRectTransform(cardRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 390f, 0f), new Vector2(360f, 320f));
@@ -726,7 +727,7 @@ namespace PuzzleBattle.Editor
                 Image frame = CreateUiImage(iconRoot, "Frame", new Color(0.16f, 0.18f, 0.24f, 0.94f));
                 StretchRect(frame.rectTransform);
                 Image icon = CreateUiImage(iconRoot, "Icon", Color.white);
-                Text level = CreateUiText(iconRoot, "Level", font, 15, FontStyle.Bold, TextAnchor.LowerCenter, new Color(1f, 0.95f, 0.76f, 1f));
+                TextMeshProUGUI level = CreateUiText(iconRoot, "Level", font, 15, FontStyle.Bold, TextAnchor.LowerCenter, new Color(1f, 0.95f, 0.76f, 1f));
                 float iconSize = 60f;
                 float spacing = 10f;
                 float centerX = 28f + (iconSize * 0.5f) + (i * (iconSize + spacing));
@@ -785,7 +786,7 @@ namespace PuzzleBattle.Editor
             RectTransform root = CreateUiRect(parent, $"{id}_Button");
             Image background = CreateUiImage(root, "Background", new Color(0.15f, 0.18f, 0.24f, 0.96f));
             StretchRect(background.rectTransform);
-            Text label = CreateUiText(root, "Label", font, 18, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
+            TextMeshProUGUI label = CreateUiText(root, "Label", font, 18, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
             label.text = labelText;
             Button button = root.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
@@ -812,19 +813,84 @@ namespace PuzzleBattle.Editor
             return rectTransform;
         }
 
-        private static Text CreateUiText(Transform parent, string objectName, Font font, int fontSize, FontStyle fontStyle, TextAnchor alignment, Color color)
+        private static TextMeshProUGUI CreateUiText(Transform parent, string objectName, Font font, int fontSize, FontStyle fontStyle, TextAnchor alignment, Color color)
         {
             RectTransform rectTransform = CreateUiRect(parent, objectName);
-            Text text = rectTransform.gameObject.AddComponent<Text>();
-            text.font = font;
-            text.fontSize = fontSize;
-            text.fontStyle = fontStyle;
-            text.alignment = alignment;
-            text.color = color;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            text.raycastTarget = false;
+            TextMeshProUGUI text = rectTransform.gameObject.AddComponent<TextMeshProUGUI>();
+            ApplyTmpTextStyle(text, fontSize, fontStyle, alignment, color);
             return text;
+        }
+
+        private static TextMeshProUGUI GetOrAddTmpText(GameObject gameObject)
+        {
+            TextMeshProUGUI tmp = gameObject.GetComponent<TextMeshProUGUI>();
+
+            if (tmp == null)
+            {
+                tmp = gameObject.AddComponent<TextMeshProUGUI>();
+            }
+
+            Text legacy = gameObject.GetComponent<Text>();
+
+            if (legacy != null)
+            {
+                legacy.enabled = false;
+            }
+
+            return tmp;
+        }
+
+        private static void ApplyTmpTextStyle(TextMeshProUGUI text, int fontSize, FontStyle fontStyle, TextAnchor alignment, Color color)
+        {
+            text.fontSize = fontSize;
+            text.fontStyle = ToTmpFontStyle(fontStyle);
+            text.alignment = ToTmpAlignment(alignment);
+            text.color = color;
+            text.enableWordWrapping = true;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.raycastTarget = false;
+        }
+
+        private static FontStyles ToTmpFontStyle(FontStyle fontStyle)
+        {
+            switch (fontStyle)
+            {
+                case FontStyle.Bold:
+                    return FontStyles.Bold;
+                case FontStyle.Italic:
+                    return FontStyles.Italic;
+                case FontStyle.BoldAndItalic:
+                    return FontStyles.Bold | FontStyles.Italic;
+                default:
+                    return FontStyles.Normal;
+            }
+        }
+
+        private static TextAlignmentOptions ToTmpAlignment(TextAnchor alignment)
+        {
+            switch (alignment)
+            {
+                case TextAnchor.UpperLeft:
+                    return TextAlignmentOptions.TopLeft;
+                case TextAnchor.UpperCenter:
+                    return TextAlignmentOptions.Top;
+                case TextAnchor.UpperRight:
+                    return TextAlignmentOptions.TopRight;
+                case TextAnchor.MiddleLeft:
+                    return TextAlignmentOptions.Left;
+                case TextAnchor.MiddleCenter:
+                    return TextAlignmentOptions.Center;
+                case TextAnchor.MiddleRight:
+                    return TextAlignmentOptions.Right;
+                case TextAnchor.LowerLeft:
+                    return TextAlignmentOptions.BottomLeft;
+                case TextAnchor.LowerCenter:
+                    return TextAlignmentOptions.Bottom;
+                case TextAnchor.LowerRight:
+                    return TextAlignmentOptions.BottomRight;
+                default:
+                    return TextAlignmentOptions.Center;
+            }
         }
 
         private static Image CreateUiImage(Transform parent, string objectName, Color color)

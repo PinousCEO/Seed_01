@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -15,9 +16,9 @@ namespace PuzzleBattle
             public RectTransform Root;
             public Image Background;
             public Image Accent;
-            public Text Title;
-            public Text Description;
-            public Text ActionLabel;
+            public TextMeshProUGUI Title;
+            public TextMeshProUGUI Description;
+            public TextMeshProUGUI ActionLabel;
             public Button Button;
             public Rect Bounds;
         }
@@ -27,7 +28,7 @@ namespace PuzzleBattle
             public RectTransform Root;
             public Image Frame;
             public Image Icon;
-            public Text LevelLabel;
+            public TextMeshProUGUI LevelLabel;
         }
 
         private sealed class HudButton
@@ -35,7 +36,7 @@ namespace PuzzleBattle
             public string Id;
             public RectTransform Root;
             public Image Background;
-            public Text Label;
+            public TextMeshProUGUI Label;
             public Button Button;
             public Rect Bounds;
         }
@@ -86,17 +87,16 @@ namespace PuzzleBattle
         private RectTransform _playerHealthRoot;
         private Image _playerHealthBarBackground;
         private Image _playerHealthBarFill;
-        private Text _playerHealthLabel;
-        private Font _uiFont;
+        private TextMeshProUGUI _playerHealthLabel;
         private Match3BoardController _boardController;
         private MonsterLaneController _monsterLaneController;
         private Image _coinHudIcon;
-        private Text _coinLabel;
-        private Text _roundLabel;
-        private Text _statusLabel;
-        private Text _timerLabel;
-        private Text _skillsLabel;
-        private Text _comboLabel;
+        private TextMeshProUGUI _coinLabel;
+        private TextMeshProUGUI _roundLabel;
+        private TextMeshProUGUI _statusLabel;
+        private TextMeshProUGUI _timerLabel;
+        private TextMeshProUGUI _skillsLabel;
+        private TextMeshProUGUI _comboLabel;
         private readonly List<AcquiredSkillIcon> _skillIcons = new List<AcquiredSkillIcon>();
         private readonly List<HudButton> _hudButtons = new List<HudButton>();
         private readonly List<SkillChoiceCard> _skillCards = new List<SkillChoiceCard>();
@@ -1605,9 +1605,9 @@ namespace PuzzleBattle
             StretchRect(background.rectTransform);
 
             Image accent = CreateUiImage(root, "Accent", ProceduralSpriteLibrary.GetSquareSprite(), Color.white);
-            Text title = CreateUiLabel(root, "Title", 26, FontStyle.Bold, TextAnchor.UpperCenter, Color.white);
-            Text description = CreateUiLabel(root, "Description", 18, FontStyle.Normal, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.82f));
-            Text action = CreateUiLabel(root, "Action", 18, FontStyle.Bold, TextAnchor.LowerCenter, new Color(1f, 0.95f, 0.72f, 1f));
+            TextMeshProUGUI title = CreateUiLabel(root, "Title", 26, FontStyle.Bold, TextAnchor.UpperCenter, Color.white);
+            TextMeshProUGUI description = CreateUiLabel(root, "Description", 18, FontStyle.Normal, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.82f));
+            TextMeshProUGUI action = CreateUiLabel(root, "Action", 18, FontStyle.Bold, TextAnchor.LowerCenter, new Color(1f, 0.95f, 0.72f, 1f));
             Button button = root.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
             button.onClick.AddListener(() => OnSkillCardPressed(index));
@@ -1633,7 +1633,7 @@ namespace PuzzleBattle
             StretchRect(frame.rectTransform);
 
             Image icon = CreateUiImage(root, "Icon", ProceduralSpriteLibrary.GetOrbSprite(), Color.white);
-            Text level = CreateUiLabel(root, "Level", 15, FontStyle.Bold, TextAnchor.LowerCenter, new Color(1f, 0.95f, 0.76f, 1f));
+            TextMeshProUGUI level = CreateUiLabel(root, "Level", 15, FontStyle.Bold, TextAnchor.LowerCenter, new Color(1f, 0.95f, 0.76f, 1f));
             root.gameObject.SetActive(false);
 
             return new AcquiredSkillIcon
@@ -1650,7 +1650,7 @@ namespace PuzzleBattle
             RectTransform root = CreateUiRect(_topUiRoot, $"{id}_Button");
             Image background = CreateUiImage(root, "Background", ProceduralSpriteLibrary.GetSquareSprite(), new Color(0.15f, 0.18f, 0.24f, 0.96f));
             StretchRect(background.rectTransform);
-            Text label = CreateUiLabel(root, "Label", 18, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
+            TextMeshProUGUI label = CreateUiLabel(root, "Label", 18, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
             label.text = labelText;
             Button button = root.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
@@ -2291,7 +2291,6 @@ namespace PuzzleBattle
             }
 
             EnsureEventSystem();
-            _uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             if (TryUseExternalCanvasHost())
             {
@@ -2365,21 +2364,21 @@ namespace PuzzleBattle
             _uiRoot = uiRoot;
             _topUiRoot = topUiRoot;
             _cardAreaRoot = cardAreaRoot;
-            _roundLabel = document.RoundLabel;
-            _statusLabel = document.StatusLabel;
-            _timerLabel = document.TimerLabel;
-            _skillsLabel = document.SkillsLabel;
-            _comboLabel = document.ComboLabel;
+            _roundLabel = ConvertToTmp(document.RoundLabel);
+            _statusLabel = ConvertToTmp(document.StatusLabel);
+            _timerLabel = ConvertToTmp(document.TimerLabel);
+            _skillsLabel = ConvertToTmp(document.SkillsLabel);
+            _comboLabel = ConvertToTmp(document.ComboLabel);
             _turnTimerBarRoot = turnTimerBar.Root;
             _turnTimerBarBackground = turnTimerBar.Background;
             _turnTimerBarFill = turnTimerBar.Fill;
             _coinHudRoot = coinHud.Root;
             _coinHudIcon = coinHud.Icon;
-            _coinLabel = coinHud.Label;
+            _coinLabel = ConvertToTmp(coinHud.Label);
             _playerHealthRoot = playerHealthBar.Root;
             _playerHealthBarBackground = playerHealthBar.Background;
             _playerHealthBarFill = playerHealthBar.Fill;
-            _playerHealthLabel = playerHealthBar.Label;
+            _playerHealthLabel = ConvertToTmp(playerHealthBar.Label);
 
             _skillCards.Clear();
             PuzzleBattleUiDocument.SkillCardSlot[] cardSlots = document.SkillCards;
@@ -2410,9 +2409,9 @@ namespace PuzzleBattle
                         Root = slot.Root,
                         Background = slot.Background,
                         Accent = slot.Accent,
-                        Title = slot.Title,
-                        Description = slot.Description,
-                        ActionLabel = slot.ActionLabel,
+                        Title = ConvertToTmp(slot.Title),
+                        Description = ConvertToTmp(slot.Description),
+                        ActionLabel = ConvertToTmp(slot.ActionLabel),
                         Button = slot.Button,
                         Bounds = new Rect()
                     });
@@ -2438,7 +2437,7 @@ namespace PuzzleBattle
                         Root = slot.Root,
                         Frame = slot.Frame,
                         Icon = slot.Icon,
-                        LevelLabel = slot.LevelLabel
+                        LevelLabel = ConvertToTmp(slot.LevelLabel)
                     });
                 }
             }
@@ -2471,7 +2470,7 @@ namespace PuzzleBattle
                         Id = id,
                         Root = slot.Root,
                         Background = slot.Background,
-                        Label = slot.Label,
+                        Label = ConvertToTmp(slot.Label),
                         Button = slot.Button,
                         Bounds = new Rect()
                     });
@@ -2537,19 +2536,91 @@ namespace PuzzleBattle
             return rectObject.GetComponent<RectTransform>();
         }
 
-        private Text CreateUiLabel(Transform parent, string objectName, int fontSize, FontStyle fontStyle, TextAnchor alignment, Color color)
+        private TextMeshProUGUI CreateUiLabel(Transform parent, string objectName, int fontSize, FontStyle fontStyle, TextAnchor alignment, Color color)
         {
             RectTransform rect = CreateUiRect(parent, objectName);
-            Text label = rect.gameObject.AddComponent<Text>();
-            label.font = _uiFont;
-            label.fontSize = fontSize;
-            label.fontStyle = fontStyle;
-            label.alignment = alignment;
-            label.color = color;
-            label.horizontalOverflow = HorizontalWrapMode.Wrap;
-            label.verticalOverflow = VerticalWrapMode.Overflow;
-            label.raycastTarget = false;
+            TextMeshProUGUI label = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            ApplyTmpLabelStyle(label, fontSize, fontStyle, alignment, color);
             return label;
+        }
+
+        private static TextMeshProUGUI ConvertToTmp(TextMeshProUGUI tmpText)
+        {
+            return tmpText;
+        }
+
+        private static TextMeshProUGUI ConvertToTmp(Text legacyText)
+        {
+            if (legacyText == null)
+            {
+                return null;
+            }
+
+            TextMeshProUGUI tmp = legacyText.GetComponent<TextMeshProUGUI>();
+
+            if (tmp == null)
+            {
+                tmp = legacyText.gameObject.AddComponent<TextMeshProUGUI>();
+            }
+
+            tmp.text = legacyText.text;
+            ApplyTmpLabelStyle(tmp, legacyText.fontSize, legacyText.fontStyle, legacyText.alignment, legacyText.color);
+            tmp.raycastTarget = legacyText.raycastTarget;
+            legacyText.enabled = false;
+            return tmp;
+        }
+
+        private static void ApplyTmpLabelStyle(TextMeshProUGUI label, int fontSize, FontStyle fontStyle, TextAnchor alignment, Color color)
+        {
+            label.fontSize = fontSize;
+            label.fontStyle = ToTmpFontStyle(fontStyle);
+            label.alignment = ToTmpAlignment(alignment);
+            label.color = color;
+            label.enableWordWrapping = true;
+            label.overflowMode = TextOverflowModes.Overflow;
+            label.raycastTarget = false;
+        }
+
+        private static FontStyles ToTmpFontStyle(FontStyle fontStyle)
+        {
+            switch (fontStyle)
+            {
+                case FontStyle.Bold:
+                    return FontStyles.Bold;
+                case FontStyle.Italic:
+                    return FontStyles.Italic;
+                case FontStyle.BoldAndItalic:
+                    return FontStyles.Bold | FontStyles.Italic;
+                default:
+                    return FontStyles.Normal;
+            }
+        }
+
+        private static TextAlignmentOptions ToTmpAlignment(TextAnchor alignment)
+        {
+            switch (alignment)
+            {
+                case TextAnchor.UpperLeft:
+                    return TextAlignmentOptions.TopLeft;
+                case TextAnchor.UpperCenter:
+                    return TextAlignmentOptions.Top;
+                case TextAnchor.UpperRight:
+                    return TextAlignmentOptions.TopRight;
+                case TextAnchor.MiddleLeft:
+                    return TextAlignmentOptions.Left;
+                case TextAnchor.MiddleCenter:
+                    return TextAlignmentOptions.Center;
+                case TextAnchor.MiddleRight:
+                    return TextAlignmentOptions.Right;
+                case TextAnchor.LowerLeft:
+                    return TextAlignmentOptions.BottomLeft;
+                case TextAnchor.LowerCenter:
+                    return TextAlignmentOptions.Bottom;
+                case TextAnchor.LowerRight:
+                    return TextAlignmentOptions.BottomRight;
+                default:
+                    return TextAlignmentOptions.Center;
+            }
         }
 
         private static Image CreateUiImage(Transform parent, string objectName, Sprite sprite, Color color)

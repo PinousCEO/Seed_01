@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -18,7 +19,7 @@ namespace PuzzleBattle
         {
             public RectTransform Root;
             public Image Icon;
-            public Text Label;
+            public TextMeshProUGUI Label;
         }
 
         [System.Serializable]
@@ -27,7 +28,7 @@ namespace PuzzleBattle
             public RectTransform Root;
             public Image Background;
             public Image Fill;
-            public Text Label;
+            public TextMeshProUGUI Label;
         }
 
         [System.Serializable]
@@ -36,9 +37,9 @@ namespace PuzzleBattle
             public RectTransform Root;
             public Image Background;
             public Image Accent;
-            public Text Title;
-            public Text Description;
-            public Text ActionLabel;
+            public TextMeshProUGUI Title;
+            public TextMeshProUGUI Description;
+            public TextMeshProUGUI ActionLabel;
             public Button Button;
         }
 
@@ -48,7 +49,7 @@ namespace PuzzleBattle
             public RectTransform Root;
             public Image Frame;
             public Image Icon;
-            public Text LevelLabel;
+            public TextMeshProUGUI LevelLabel;
         }
 
         [System.Serializable]
@@ -57,7 +58,7 @@ namespace PuzzleBattle
             public string Id;
             public RectTransform Root;
             public Image Background;
-            public Text Label;
+            public TextMeshProUGUI Label;
             public Button Button;
         }
 
@@ -66,11 +67,11 @@ namespace PuzzleBattle
         [SerializeField] private RectTransform topUiRoot;
         [SerializeField] private RectTransform cardAreaRoot;
         [SerializeField] private bool applyRuntimeLayout;
-        [SerializeField] private Text roundLabel;
-        [SerializeField] private Text statusLabel;
-        [SerializeField] private Text timerLabel;
-        [SerializeField] private Text skillsLabel;
-        [SerializeField] private Text comboLabel;
+        [SerializeField] private TextMeshProUGUI roundLabel;
+        [SerializeField] private TextMeshProUGUI statusLabel;
+        [SerializeField] private TextMeshProUGUI timerLabel;
+        [SerializeField] private TextMeshProUGUI skillsLabel;
+        [SerializeField] private TextMeshProUGUI comboLabel;
         [SerializeField] private TurnTimerBarSlot turnTimerBar;
         [SerializeField] private CoinHudSlot coinHud;
         [SerializeField] private PlayerHealthBarSlot playerHealthBar;
@@ -83,11 +84,11 @@ namespace PuzzleBattle
         public RectTransform TopUiRoot => topUiRoot;
         public RectTransform CardAreaRoot => cardAreaRoot;
         public bool ApplyRuntimeLayout => applyRuntimeLayout;
-        public Text RoundLabel => roundLabel;
-        public Text StatusLabel => statusLabel;
-        public Text TimerLabel => timerLabel;
-        public Text SkillsLabel => skillsLabel;
-        public Text ComboLabel => comboLabel;
+        public TextMeshProUGUI RoundLabel => roundLabel;
+        public TextMeshProUGUI StatusLabel => statusLabel;
+        public TextMeshProUGUI TimerLabel => timerLabel;
+        public TextMeshProUGUI SkillsLabel => skillsLabel;
+        public TextMeshProUGUI ComboLabel => comboLabel;
         public TurnTimerBarSlot TurnTimerBar => turnTimerBar;
         public CoinHudSlot CoinHud => coinHud;
         public PlayerHealthBarSlot PlayerHealthBar => playerHealthBar;
@@ -101,11 +102,11 @@ namespace PuzzleBattle
             RectTransform topUiRootValue,
             RectTransform cardAreaRootValue,
             bool applyRuntimeLayoutValue,
-            Text roundLabelValue,
-            Text statusLabelValue,
-            Text timerLabelValue,
-            Text skillsLabelValue,
-            Text comboLabelValue,
+            TextMeshProUGUI roundLabelValue,
+            TextMeshProUGUI statusLabelValue,
+            TextMeshProUGUI timerLabelValue,
+            TextMeshProUGUI skillsLabelValue,
+            TextMeshProUGUI comboLabelValue,
             TurnTimerBarSlot turnTimerBarValue,
             CoinHudSlot coinHudValue,
             PlayerHealthBarSlot playerHealthBarValue,
